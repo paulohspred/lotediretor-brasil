@@ -19,7 +19,8 @@ Novas funcionalidades não devem ser implementadas diretamente em `main`.
 5. abrir PR para `develop`;
 6. registrar no PR o que está IMPLEMENTADO, TESTADO, INTEGRADO e HOMOLOGADO;
 7. corrigir CI/revisão antes do merge;
-8. promover de `develop` para `main` somente em checkpoints de release.
+8. exigir CI verde antes do merge;
+9. promover de `develop` para `main` somente em checkpoints de release.
 
 ## Regras para Codex e outros agentes
 

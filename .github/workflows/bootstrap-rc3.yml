@@ -1,0 +1,75 @@
+name: Bootstrap RC3 from ZIP
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - LoteDiretor_SaaS_v19_RC3_FULL.zip
+
+permissions:
+  contents: write
+
+jobs:
+  import-rc3:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify uploaded RC3 archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f LoteDiretor_SaaS_v19_RC3_FULL.zip
+          echo 'd82e19f6122bc6231da92a22c47ff7b07b287598762684fa2388218383368fab  LoteDiretor_SaaS_v19_RC3_FULL.zip' | sha256sum -c -
+          unzip -t LoteDiretor_SaaS_v19_RC3_FULL.zip >/dev/null
+
+      - name: Extract RC3 into repository root
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/lotediretor-rc3
+          mkdir -p /tmp/lotediretor-rc3
+          unzip -q LoteDiretor_SaaS_v19_RC3_FULL.zip -d /tmp/lotediretor-rc3
+          SRC=/tmp/lotediretor-rc3/LoteDiretor_SaaS_v19_RC3
+          test -d "$SRC"
+          test -f "$SRC/VERSION"
+          test "$(cat "$SRC/VERSION")" = '19.0.0-rc.3'
+          cp -a "$SRC"/. ./
+
+      - name: Verify package manifest after extraction
+        shell: bash
+        run: |
+          set -euo pipefail
+          sha256sum -c FILE_MANIFEST.sha256 >/dev/null
+          echo 'RC3 manifest verified.'
+
+      - name: Remove one-time bootstrap artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f LoteDiretor_SaaS_v19_RC3_FULL.zip
+          rm -f IMPORT_RC3.md
+          rm -f .github/workflows/bootstrap-rc3.yml
+
+      - name: Commit imported baseline
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'LoteDiretor Bootstrap'
+          git config user.email 'actions@users.noreply.github.com'
+          git add -A
+          git commit -m 'Import LoteDiretor SaaS v19-rc.3 baseline'
+          git push origin HEAD:main
+
+      - name: Create development branch and release tag
+        shell: bash
+        run: |
+          set -euo pipefail
+          git push origin HEAD:refs/heads/develop
+          git tag -f -a v19-rc.3 -m 'LoteDiretor SaaS v19-rc.3 baseline'
+          git push -f origin refs/tags/v19-rc.3
+          git push origin --delete import/rc3 || true

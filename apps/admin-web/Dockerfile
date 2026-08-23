@@ -1,10 +1,11 @@
 FROM node:22-alpine AS build
 WORKDIR /workspace
-COPY package.json tsconfig.base.json ./
+COPY package.json package-lock.json tsconfig.base.json ./
 COPY packages ./packages
 COPY apps/admin-web ./apps/admin-web
-RUN npm install --workspaces --include-workspace-root
+RUN npm ci --workspaces --include-workspace-root --no-audit --no-fund
 RUN npm run build -w @lotediretor/admin-web
+
 FROM node:22-alpine
 WORKDIR /app
 ENV NODE_ENV=production

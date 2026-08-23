@@ -17,6 +17,8 @@ jobs:
         run: npm ci --workspaces --include-workspace-root --no-audit --no-fund
       - name: Run RC3 validation
         run: ./validate-v19-rc3.sh
+      - name: Run v20 incremental validation
+        run: python tests/validate_v20_core_legal.py
       - name: Typecheck
         run: npm run typecheck
       - name: Build

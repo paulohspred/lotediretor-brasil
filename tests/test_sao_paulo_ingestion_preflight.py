@@ -2,11 +2,14 @@ from __future__ import annotations
 
 import importlib.util
 import os
+import sys
 from pathlib import Path
 from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
-MODULE_PATH = ROOT / 'workers/data-pipelines/sao_paulo_ingestion_preflight.py'
+PIPELINES_DIR = ROOT / 'workers/data-pipelines'
+MODULE_PATH = PIPELINES_DIR / 'sao_paulo_ingestion_preflight.py'
+sys.path.insert(0, str(PIPELINES_DIR))
 spec = importlib.util.spec_from_file_location('sp_preflight', MODULE_PATH)
 mod = importlib.util.module_from_spec(spec)
 assert spec and spec.loader

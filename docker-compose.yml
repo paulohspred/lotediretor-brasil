@@ -445,8 +445,6 @@ services:
     - aitec-engine
     - martin
   opensearch:
-    profiles:
-    - full
     image: opensearchproject/opensearch:2.19.1
     environment:
       discovery.type: single-node

@@ -87,15 +87,15 @@ export function evaluateFormula(formula:any,ctx:RuleContext):FormulaResult{
     return{status:'CALCULATED',value:Math.min(max.value as number,Math.max(min.value as number,value.value as number)),unknownFields:[],reasons:[]};
   }
   if(!args.length)return{status:'ERROR',value:null,unknownFields:[],reasons:[`missing_args:${op||'unknown'}`]};
-  const parts=args.map((x:any)=>readNumber(x,ctx));const early=combine(parts);if(early)return early;
-  const values=parts.map(x=>x.value as number);let value:number;
+  const parts:FormulaResult[]=args.map((x:any):FormulaResult=>readNumber(x,ctx));const early=combine(parts);if(early)return early;
+  const values:number[]=parts.map((x:FormulaResult):number=>x.value as number);let value:number;
   switch(op){
-    case 'add': value=values.reduce((a,b)=>a+b,0);break;
-    case 'subtract': value=values.slice(1).reduce((a,b)=>a-b,values[0]);break;
-    case 'multiply': value=values.reduce((a,b)=>a*b,1);break;
+    case 'add': value=values.reduce((a:number,b:number)=>a+b,0);break;
+    case 'subtract': value=values.slice(1).reduce((a:number,b:number)=>a-b,values[0]);break;
+    case 'multiply': value=values.reduce((a:number,b:number)=>a*b,1);break;
     case 'divide':
-      if(values.slice(1).some(x=>x===0))return{status:'ERROR',value:null,unknownFields:[],reasons:['division_by_zero']};
-      value=values.slice(1).reduce((a,b)=>a/b,values[0]);break;
+      if(values.slice(1).some((x:number)=>x===0))return{status:'ERROR',value:null,unknownFields:[],reasons:['division_by_zero']};
+      value=values.slice(1).reduce((a:number,b:number)=>a/b,values[0]);break;
     case 'min': value=Math.min(...values);break;
     case 'max': value=Math.max(...values);break;
     case 'floor': value=Math.floor(values[0]);break;

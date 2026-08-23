@@ -37,13 +37,23 @@ assert "status='CONFIRMED'" in service
 
 profile=json.loads((root/'data/municipality-labs/sao-paulo-3550308.json').read_text())
 assert profile['municipality_ibge']=='3550308'
-assert profile['status'] in {'DISCOVERED','CORE_LAYERS_MAPPED_PENDING_RUNTIME_SYNC'}
+assert profile['status'] in {
+    'DISCOVERED',
+    'CORE_LAYERS_MAPPED_PENDING_RUNTIME_SYNC',
+    'CORE_LAYERS_LIVE_SCHEMA_VERIFIED_PENDING_RUNTIME_SYNC',
+}
 assert any(s['code']=='SP_GEOSAMPA_WFS' for s in profile['sources'])
 assert any(s['code']=='SP_LEGISLACAO_PDE' for s in profile['sources'])
-# Later versions may safely promote exact WFS mappings after source metadata review.
+# Later versions may safely promote exact WFS mappings and live schema evidence after review.
 for source in profile['sources']:
     for ds in source.get('datasets',[]):
-        if source['channel']=='WFS': assert ds.get('status') in {'MAPPING_REQUIRED','MAPPED_PENDING_INGESTION','CATALOG_MAPPING_REQUIRED'}
+        if source['channel']=='WFS':
+            assert ds.get('status') in {
+                'MAPPING_REQUIRED',
+                'MAPPED_PENDING_INGESTION',
+                'LIVE_SCHEMA_VERIFIED_PENDING_INGESTION',
+                'CATALOG_MAPPING_REQUIRED',
+            }
 
 route_catalog=(root/'services/platform-api/src/contracts/route-catalog.ts').read_text()
 for path in ['/api/v1/parcel/resolve','/api/v1/legal/search','/api/v1/spatial/intersections','/api/v1/analysis/{id}/evidence']:

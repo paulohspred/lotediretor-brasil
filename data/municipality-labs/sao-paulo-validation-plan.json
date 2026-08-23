@@ -1,23 +1,49 @@
 {
   "municipality_ibge": "3550308",
-  "status": "READY_FOR_CASE_SELECTION",
+  "status": "LIVE_SCHEMA_VERIFIED_READY_FOR_RUNTIME_CASE_SELECTION",
   "minimum_cases": 10,
   "target_cases": 20,
   "rule": "Nenhum caso recebe PASS sem referência oficial, parcela confirmada, data-base, zona e parâmetros esperados revisados por humano.",
+  "source_contract": {
+    "parcel_identifier_field": "cd_identificador",
+    "parcel_area_field": "qt_area_terreno",
+    "zone_code_field": "cd_zoneamento_perimetro",
+    "zone_name_field": "tx_zoneamento_perimetro",
+    "zone_law": "18.177/2024",
+    "zone_valid_from": "2024-07-26T00:00:00-03:00",
+    "legal_scope_review_required": true
+  },
   "required_case_fields": [
     "case_code",
     "input_kind",
     "input_payload",
+    "base_date",
     "expected_official_reference",
-    "expected_parameters"
+    "expected_zone_code",
+    "expected_parameters",
+    "human_reviewer",
+    "human_reviewed_at"
   ],
   "coverage_targets": [
     "zonas distintas",
     "lote de esquina",
     "lote com geometria irregular",
+    "lote com área cadastral comparável à área geométrica",
     "interseção com camada especial quando disponível",
     "data-base histórica quando houver versão anterior",
+    "caso sujeito a limitação/suspensão jurídica específica quando identificável por fonte oficial",
     "caso sem cobertura suficiente para validar abstenção"
+  ],
+  "acceptance_checks": [
+    "identificador oficial do lote confere com GeoSampa",
+    "geometria oficial e CRS/provenance conferem",
+    "zona é resolvida pela geometria publicada correta para a data-base",
+    "lei/documento e vigência estão anexados à evidência",
+    "qualquer suspensão/limitação jurídica aplicável está explicitamente tratada",
+    "CA, TO, TP, altura, recuos, usos e restrições possuem referência revisada",
+    "resultado é reproduzível com snapshots e hashes persistidos",
+    "relatório inclui evidências e não apresenta inferência como fato confirmado",
+    "A.I Cidades cita fonte/artigo/vigência ou se abstém"
   ],
   "cases": []
 }

@@ -1,0 +1,29 @@
+:8080 {
+  encode zstd gzip
+  header {
+    X-Content-Type-Options "nosniff"
+    Referrer-Policy "strict-origin-when-cross-origin"
+    Permissions-Policy "camera=(), microphone=(), geolocation=(self)"
+    X-Frame-Options "DENY"
+    Cross-Origin-Opener-Policy "same-origin"
+    Cross-Origin-Resource-Policy "same-site"
+    -Server
+  }
+  @platform path /api/* /graphql
+  handle @platform { reverse_proxy platform-api:3001 }
+  @control path /control/*
+  handle @control { reverse_proxy control-api:3002 }
+  @tiles path /tiles/*
+  handle @tiles { reverse_proxy martin:3000 }
+  @ai path /ai/*
+  handle @ai { reverse_proxy ai-gateway:3003 }
+  @solar path /solar/*
+  handle @solar { reverse_proxy solar-engine:8001 }
+  @aitec path /aitec/*
+  handle @aitec { reverse_proxy aitec-engine:8002 }
+  @admin path /admin*
+  handle @admin { reverse_proxy admin-web:3000 }
+  @client path /app*
+  handle @client { reverse_proxy client-web:3000 }
+  handle { reverse_proxy site-web:3000 }
+}

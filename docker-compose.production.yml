@@ -1,0 +1,129 @@
+services:
+  platform-db:
+    environment:
+      POSTGRES_USER: ${PLATFORM_DB_MIGRATION_USER:?required}
+      POSTGRES_PASSWORD: ${PLATFORM_DB_MIGRATION_PASSWORD:?required}
+      POSTGRES_DB: ${PLATFORM_DB_NAME:?required}
+  control-db:
+    environment:
+      POSTGRES_USER: ${CONTROL_DB_MIGRATION_USER:?required}
+      POSTGRES_PASSWORD: ${CONTROL_DB_MIGRATION_PASSWORD:?required}
+      POSTGRES_DB: ${CONTROL_DB_NAME:?required}
+  platform-db-role-init:
+    environment:
+      PLATFORM_DB_MIGRATION_USER: ${PLATFORM_DB_MIGRATION_USER:?required}
+      PLATFORM_DB_MIGRATION_PASSWORD: ${PLATFORM_DB_MIGRATION_PASSWORD:?required}
+      PLATFORM_DB_NAME: ${PLATFORM_DB_NAME:?required}
+      PLATFORM_DB_APP_PASSWORD: ${PLATFORM_DB_APP_PASSWORD:?required}
+      PLATFORM_DB_TILES_PASSWORD: ${PLATFORM_DB_TILES_PASSWORD:?required}
+      CONTROL_DB_MIGRATION_USER: ${CONTROL_DB_MIGRATION_USER:?required}
+      CONTROL_DB_MIGRATION_PASSWORD: ${CONTROL_DB_MIGRATION_PASSWORD:?required}
+      CONTROL_DB_NAME: ${CONTROL_DB_NAME:?required}
+      CONTROL_DB_APP_PASSWORD: ${CONTROL_DB_APP_PASSWORD:?required}
+      PLATFORM_DB_EVENT_PASSWORD: ${PLATFORM_DB_EVENT_PASSWORD:?required}
+      PLATFORM_DB_WORKER_PASSWORD: ${PLATFORM_DB_WORKER_PASSWORD:?required}
+      CONTROL_DB_WORKER_PASSWORD: ${CONTROL_DB_WORKER_PASSWORD:?required}
+  minio:
+    environment:
+      MINIO_ROOT_USER: ${S3_ACCESS_KEY:?required}
+      MINIO_ROOT_PASSWORD: ${S3_SECRET_KEY:?required}
+    ports: []
+  keycloak:
+    command:
+    - start
+    - --import-realm
+    environment:
+      KC_HTTP_ENABLED: 'true'
+      KC_PROXY_HEADERS: xforwarded
+      KC_HOSTNAME: ${AUTH_DOMAIN:?required}
+      KC_HOSTNAME_STRICT: 'true'
+      KC_HEALTH_ENABLED: 'true'
+      KC_METRICS_ENABLED: 'true'
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN:?required}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?required}
+    ports: []
+    volumes:
+    - ./infra/keycloak/generated/realm-lotediretor.production.json:/opt/keycloak/data/import/realm-lotediretor.json:ro
+    - ./infra/keycloak/themes/lotediretor:/opt/keycloak/themes/lotediretor:ro
+  platform-api:
+    environment:
+      NODE_ENV: production
+      PLATFORM_DATABASE_URL: postgresql://${PLATFORM_DB_APP_USER:-lotediretor_app}:${PLATFORM_DB_APP_PASSWORD:?required}@platform-db:5432/${PLATFORM_DB_NAME:?required}
+      PLATFORM_MIGRATION_DATABASE_URL: postgresql://${PLATFORM_DB_MIGRATION_USER:?required}:${PLATFORM_DB_MIGRATION_PASSWORD:?required}@platform-db:5432/${PLATFORM_DB_NAME:?required}
+      SESSION_COOKIE_SECURE: 'true'
+      ALLOW_LOCAL_AUTO_MEMBERSHIP: 'false'
+      INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN:?required}
+      OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:?required}
+      KEYCLOAK_PUBLIC_ISSUER: https://${AUTH_DOMAIN:?required}/realms/lotediretor
+      OIDC_REDIRECT_URI: https://${PUBLIC_DOMAIN:?required}/api/v1/auth/callback
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY:?required}
+      S3_SECRET_KEY: ${S3_SECRET_KEY:?required}
+      RUN_MIGRATIONS_ON_START: 'false'
+  control-api:
+    environment:
+      NODE_ENV: production
+      CONTROL_DATABASE_URL: postgresql://${CONTROL_DB_APP_USER:-lotediretor_control_app}:${CONTROL_DB_APP_PASSWORD:?required}@control-db:5432/${CONTROL_DB_NAME:?required}
+      CONTROL_MIGRATION_DATABASE_URL: postgresql://${CONTROL_DB_MIGRATION_USER:?required}:${CONTROL_DB_MIGRATION_PASSWORD:?required}@control-db:5432/${CONTROL_DB_NAME:?required}
+      INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN:?required}
+      MERCADOPAGO_WEBHOOK_SECRET: ${MERCADOPAGO_WEBHOOK_SECRET:-}
+      RUN_MIGRATIONS_ON_START: 'false'
+  ai-gateway:
+    environment:
+      NODE_ENV: production
+      INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN:?required}
+  solar-engine:
+    environment:
+      APP_ENV: production
+      INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN:?required}
+  aitec-engine:
+    environment:
+      APP_ENV: production
+      INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN:?required}
+  gateway:
+    ports:
+    - 80:80
+    - 443:443
+    environment:
+      PUBLIC_DOMAIN: ${PUBLIC_DOMAIN:?required}
+      AUTH_DOMAIN: ${AUTH_DOMAIN:?required}
+      ACME_EMAIL: ${ACME_EMAIL:?required}
+    volumes:
+    - ./infra/caddy/Caddyfile.production:/etc/caddy/Caddyfile:ro
+    - caddy_data:/data
+    - caddy_config:/config
+  prometheus:
+    ports: []
+  grafana:
+    ports: []
+  event-dispatcher:
+    environment:
+      PLATFORM_EVENT_DATABASE_URL: postgresql://lotediretor_event_dispatcher:${PLATFORM_DB_EVENT_PASSWORD:?required}@platform-db:5432/${PLATFORM_DB_NAME:?required}
+      NATS_URL: ${NATS_URL:-nats://nats:4222}
+  geo-worker:
+    environment:
+      PLATFORM_DATABASE_URL: postgresql://lotediretor_worker:${PLATFORM_DB_WORKER_PASSWORD:?required}@platform-db:5432/${PLATFORM_DB_NAME:?required}
+  document-worker:
+    environment:
+      PLATFORM_DATABASE_URL: postgresql://lotediretor_worker:${PLATFORM_DB_WORKER_PASSWORD:?required}@platform-db:5432/${PLATFORM_DB_NAME:?required}
+  report-worker:
+    environment:
+      PLATFORM_DATABASE_URL: postgresql://lotediretor_worker:${PLATFORM_DB_WORKER_PASSWORD:?required}@platform-db:5432/${PLATFORM_DB_NAME:?required}
+  data-pipelines:
+    environment:
+      PLATFORM_DATABASE_URL: postgresql://lotediretor_worker:${PLATFORM_DB_WORKER_PASSWORD:?required}@platform-db:5432/${PLATFORM_DB_NAME:?required}
+  ai-ingest:
+    environment:
+      PLATFORM_DATABASE_URL: postgresql://lotediretor_worker:${PLATFORM_DB_WORKER_PASSWORD:?required}@platform-db:5432/${PLATFORM_DB_NAME:?required}
+  billing-worker:
+    environment:
+      CONTROL_DATABASE_URL: postgresql://lotediretor_control_worker:${CONTROL_DB_WORKER_PASSWORD:?required}@control-db:5432/${CONTROL_DB_NAME:?required}
+      PLATFORM_DATABASE_URL: postgresql://lotediretor_worker:${PLATFORM_DB_WORKER_PASSWORD:?required}@platform-db:5432/${PLATFORM_DB_NAME:?required}
+  platform-migrate:
+    environment:
+      PLATFORM_MIGRATION_DATABASE_URL: postgresql://${PLATFORM_DB_MIGRATION_USER:?required}:${PLATFORM_DB_MIGRATION_PASSWORD:?required}@platform-db:5432/${PLATFORM_DB_NAME:?required}
+  control-migrate:
+    environment:
+      CONTROL_MIGRATION_DATABASE_URL: postgresql://${CONTROL_DB_MIGRATION_USER:?required}:${CONTROL_DB_MIGRATION_PASSWORD:?required}@control-db:5432/${CONTROL_DB_NAME:?required}
+volumes:
+  caddy_data: null
+  caddy_config: null

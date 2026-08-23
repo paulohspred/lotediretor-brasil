@@ -1,0 +1,11 @@
+{
+  "case_code": "3550308-EXAMPLE-REPLACE",
+  "input_kind": "POINT",
+  "input_payload": {"point": {"lat": null, "lon": null}},
+  "expected_official_reference": null,
+  "expected_parameters": {},
+  "expected_zone_code": null,
+  "status": "PENDING_HUMAN_REVIEW",
+  "reviewer": null,
+  "notes": "Template only. Never mark PASS without official parcel/zone reference and human-reviewed parameters."
+}

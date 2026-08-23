@@ -1,0 +1,1 @@
+import {Shell} from '../../components/Shell';import {SolarWorkspace} from '../../components/workspaces/SolarWorkspace';export default function Page(){return <Shell><main className="page"><SolarWorkspace/></main></Shell>}

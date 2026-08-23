@@ -1,0 +1,22 @@
+{
+  "from": "v19-rc.1",
+  "to": "v19-rc.2",
+  "scope": "A.I TEC surface-parking geometry + clean RC packaging",
+  "added": [
+    "generate_surface_parking_layout deterministic geometry solver",
+    "PARKING_STALL geometry objects",
+    "DRIVE_AISLE geometry objects",
+    "PARKING_MIN hard constraint",
+    "parking shortfall detection",
+    "configurable stall/aisle dimensions",
+    "parking geometry client controls and metrics",
+    "RC2 parking geometry regression test"
+  ],
+  "notClaimed": [
+    "road/access solver",
+    "ramps/basement parking",
+    "structural columns/fire design",
+    "local parking-rule inference",
+    "production homologation"
+  ]
+}

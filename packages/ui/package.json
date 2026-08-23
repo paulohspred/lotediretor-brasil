@@ -1,0 +1,13 @@
+{
+  "name": "@lotediretor/ui",
+  "version": "19.0.0-rc.3",
+  "private": true,
+  "type": "module",
+  "peerDependencies": {
+    "react": "^19.0.0"
+  },
+  "exports": {
+    ".": "./src/index.tsx",
+    "./ui.css": "./src/ui.css"
+  }
+}

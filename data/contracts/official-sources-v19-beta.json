@@ -1,0 +1,41 @@
+{
+  "version": 19,
+  "rules": [
+    "identified endpoint != ingested dataset",
+    "activation requires operator opt-in",
+    "license/access terms URL required",
+    "raw snapshot must be immutable and hashed",
+    "blocking quality checks must PASS before publication"
+  ],
+  "sources": {
+    "IBGE_LOCALIDADES": {
+      "authority": "IBGE",
+      "mode": "REST",
+      "adapter": "ACTIVE"
+    },
+    "SIGEF": {
+      "authority": "INCRA",
+      "mode": "CONECTA_GOV_API",
+      "credentialsRequired": true
+    },
+    "IBAMA_EMBARGO": {
+      "authority": "IBAMA",
+      "mode": "CKAN_SHP_ZIP_GDAL",
+      "license": "ODbL",
+      "adapter": "READY_NOT_ACTIVATED",
+      "operatorEndpointExample": "https://dadosabertos.ibama.gov.br/api/3/action/package_show?id=termos-de-embargo"
+    },
+    "PRODES": {
+      "authority": "INPE/TerraBrasilis",
+      "mode": "WFS",
+      "typeNameMustBePinned": true,
+      "adapter": "READY_NOT_ACTIVATED",
+      "wfsBase": "https://terrabrasilis.dpi.inpe.br/geoserver/ows"
+    },
+    "CAR": {
+      "authority": "SICAR/competent authority",
+      "mode": "CONTROLLED_IMPORT_OR_VERIFIED_ENDPOINT",
+      "adapter": "READY_NOT_ACTIVATED"
+    }
+  }
+}

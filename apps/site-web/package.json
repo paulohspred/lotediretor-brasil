@@ -1,0 +1,25 @@
+{
+  "name": "@lotediretor/site-web",
+  "version": "19.0.0-rc.3",
+  "private": true,
+  "scripts": {
+    "dev": "next dev -H 0.0.0.0",
+    "build": "next build",
+    "start": "next start -H 0.0.0.0",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "next": "^15.2.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "@lotediretor/design-tokens": "19.0.0-rc.3",
+    "@lotediretor/ui": "19.0.0-rc.3",
+    "@lotediretor/domain-types": "19.0.0-rc.3"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.0",
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0"
+  }
+}

@@ -1,0 +1,7 @@
+{
+  "name": "@lotediretor/api-contracts",
+  "version": "19.0.0-rc.3",
+  "private": true,
+  "main": "src/index.ts",
+  "types": "src/index.ts"
+}

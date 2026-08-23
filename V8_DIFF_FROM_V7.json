@@ -1,0 +1,26 @@
+{
+  "v7_files": 183,
+  "v8_files": 199,
+  "new": 16,
+  "modified": 29,
+  "removed": 0,
+  "new_files": [
+    "docs/data/SOURCE_INTEGRATION_STATUS_V8.md",
+    "infra/grafana/dashboards/platform-overview.json",
+    "infra/grafana/provisioning/dashboards/default.yml",
+    "infra/grafana/provisioning/datasources/prometheus.yml",
+    "infra/prometheus/prometheus.yml",
+    "ops/backup/backup.sh",
+    "ops/backup/restore-drill.sh",
+    "ops/rls/run.sh",
+    "ops/rls/tenant-isolation.sql",
+    "ops/runtime/smoke.sh",
+    "services/control-api/src/v8.metrics.controller.ts",
+    "services/platform-api/src/v8.metrics.controller.ts",
+    "tests/test_data_connectors.py",
+    "tests/validate_v8_contracts.py",
+    "validate-v8.ps1",
+    "validate-v8.sh"
+  ],
+  "removed_files": []
+}

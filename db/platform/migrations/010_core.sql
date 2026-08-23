@@ -1,0 +1,9 @@
+CREATE SCHEMA IF NOT EXISTS iam;CREATE SCHEMA IF NOT EXISTS core;CREATE SCHEMA IF NOT EXISTS audit;
+CREATE TABLE IF NOT EXISTS iam.organization(id uuid PRIMARY KEY DEFAULT uuidv7(),name text NOT NULL,kind text NOT NULL DEFAULT 'COMPANY',status text NOT NULL DEFAULT 'ACTIVE',created_at timestamptz NOT NULL DEFAULT now());
+CREATE TABLE IF NOT EXISTS iam.user_profile(id uuid PRIMARY KEY, email text NOT NULL UNIQUE, display_name text, created_at timestamptz NOT NULL DEFAULT now());
+CREATE TABLE IF NOT EXISTS iam.membership(id uuid PRIMARY KEY DEFAULT uuidv7(),organization_id uuid NOT NULL REFERENCES iam.organization(id),user_id uuid NOT NULL REFERENCES iam.user_profile(id),role text NOT NULL,created_at timestamptz NOT NULL DEFAULT now(),UNIQUE(organization_id,user_id));
+CREATE TABLE IF NOT EXISTS core.module(code text PRIMARY KEY,name text NOT NULL,status text NOT NULL DEFAULT 'FOUNDATION',sort_order int NOT NULL DEFAULT 100);
+CREATE TABLE IF NOT EXISTS core.entitlement_snapshot(id uuid PRIMARY KEY DEFAULT uuidv7(),organization_id uuid NOT NULL REFERENCES iam.organization(id),snapshot jsonb NOT NULL,valid_from timestamptz NOT NULL DEFAULT now(),valid_to timestamptz);
+CREATE TABLE IF NOT EXISTS audit.event(id uuid PRIMARY KEY DEFAULT uuidv7(),tenant_id uuid,actor_id uuid,action text NOT NULL,object_type text,object_id text,metadata jsonb NOT NULL DEFAULT '{}'::jsonb,created_at timestamptz NOT NULL DEFAULT now());
+INSERT INTO iam.organization(id,name,kind) VALUES('0198f001-0000-7000-8000-000000000001','Workspace Local','COMPANY') ON CONFLICT DO NOTHING;
+INSERT INTO core.module(code,name,sort_order) VALUES('imovel360','Imóvel 360',10),('re-rural','RE Rural',20),('condominio','Condomínio',30),('energia-solar','Energia Solar',40),('ai-tec','A.I TEC',50),('prefeitura','Prefeitura',60),('relatorios','Relatórios',70) ON CONFLICT(code) DO UPDATE SET name=excluded.name,sort_order=excluded.sort_order;

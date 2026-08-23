@@ -1,0 +1,23 @@
+{
+  "name": "lotediretor-platform",
+  "private": true,
+  "version": "19.0.0-rc.3",
+  "workspaces": [
+    "apps/*",
+    "services/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:site": "npm run dev -w @lotediretor/site-web",
+    "dev:client": "npm run dev -w @lotediretor/client-web",
+    "dev:admin": "npm run dev -w @lotediretor/admin-web",
+    "dev:platform": "npm run dev -w @lotediretor/platform-api",
+    "dev:control": "npm run dev -w @lotediretor/control-api",
+    "dev:ai": "npm run dev -w @lotediretor/ai-gateway",
+    "build": "npm run build --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

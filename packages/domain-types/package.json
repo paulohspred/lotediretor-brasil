@@ -1,0 +1,7 @@
+{
+  "name": "@lotediretor/domain-types",
+  "version": "19.0.0-rc.3",
+  "private": true,
+  "type": "module",
+  "exports": "./src/index.ts"
+}

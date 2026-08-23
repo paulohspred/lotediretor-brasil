@@ -1,0 +1,7 @@
+.ld-btn{height:40px;border-radius:9px;padding:0 14px;border:1px solid transparent;font-weight:700;cursor:pointer;transition:.16s ease}
+.ld-btn--primary{background:var(--ld-green-moss);color:white}.ld-btn--primary:hover{background:var(--ld-green-deep)}
+.ld-btn--secondary{background:#fff;color:var(--ld-black);border-color:var(--ld-border)}
+.ld-btn--danger{background:var(--ld-danger);color:#fff}
+.ld-card{background:#fff;border:1px solid var(--ld-border);border-radius:12px;box-shadow:0 2px 12px rgba(17,24,39,.025)}
+.ld-badge{display:inline-flex;align-items:center;padding:4px 8px;border-radius:999px;font-size:.7rem;font-weight:700;background:#f3f4f6;color:#4b5563}
+.ld-badge--success{background:#ecfdf3;color:#067647}.ld-badge--warning{background:#fffaeb;color:#b54708}.ld-badge--danger{background:#fef3f2;color:#b42318}.ld-badge--info{background:#eff8ff;color:#175cd3}

@@ -1,0 +1,31 @@
+{
+  "from": "19.0.0-beta.1",
+  "to": "19.0.0-rc.1",
+  "createdAtUtc": "2026-08-23T12:35:34Z",
+  "highlights": [
+    "public/private/institutional AI Knowledge Plane with ACL, retrieval authorization and document provenance",
+    "legal-time and system-knowledge bitemporality with baseDate plus knowledgeAt retrieval filters",
+    "OpenSearch evidence index v3 mapping and additive mapping upgrade path",
+    "official public legal document versions feed reconstructible retrieval corpus without auto-confirming legal rules",
+    "page-aware semantic chunks and reindex invalidation on legal/condo state changes",
+    "hybrid lexical/vector RRF plus deterministic legal reranking and explicit public-scope guard",
+    "versioned Prompt/Tool Registry foundation with assistant allowlists and explicit-action requirement for write tools",
+    "high-risk AI conclusions require applicable CONFIRMED deterministic rules and professional review",
+    "grounded/abstained response fields plus evidence allowlist enforcement",
+    "geometry-aware deterministic A.I TEC Site Solver MVP with reproducible seed and non-dominated Pareto frontier",
+    "A.I TEC solution/geometry/violation/lock persistence with RLS",
+    "A.I TEC generate/list/detail solution APIs and client workspace controls",
+    "CI/release/runtime version normalized to v19-rc.1"
+  ],
+  "productionHomologated": false,
+  "mandatoryExternalGates": [
+    "generate package-lock.json in registry-connected environment",
+    "clean npm ci/typecheck/build",
+    "PostgreSQL/PostGIS runtime migrations 193/194 and RLS tests",
+    "Docker runtime acceptance",
+    "OpenSearch v3 + real embedding/model providers and retrieval/security evaluation",
+    "São Paulo live WFS ingestion/promotion and 10-20 human golden-lot cases",
+    "browser E2E/accessibility",
+    "staging/load/pentest/canary/backup-restore/DR"
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "version": "v19-rc.3",
+  "runtimeVersion": "19.0.0-rc.3",
+  "milestone": "CORE_CLOSURE_AITEC_ACCESS_BRANCH_PROGRAM_TERRAIN_BUILDING_SOLAR_ELECTRICAL",
+  "estimatesAreNotAcceptanceCriteria": true,
+  "measurementPolicy": "Track architecture, functional depth, real-data coverage and production gates separately; do not infer production readiness from file/endpoint counts.",
+  "completedInRc3": [
+    "A.I TEC explicit access/road conceptual geometry without inferred street entrance",
+    "A.I TEC geometry locks plus parent/branch/regenerate preserving locked footprints",
+    "A.I TEC unit-mix program gate with minimum-count and minimum-total shortfall",
+    "A.I TEC cut/fill conceptual estimate only from explicit metric terrain samples",
+    "A.I TEC preliminary building stack with floor plate/core/circulation geometry",
+    "A.I TEC analysis persistence and GeoJSON/CSV solution exports",
+    "tenant-consistent composite keys/foreign keys for new A.I TEC solution relationships",
+    "Solar explicit-datasheet string/MPPT preliminary electrical design",
+    "Solar regulation global-vs-tenant NULL uniqueness correction",
+    "São Paulo WFS inspection tooling decoupled from PostgreSQL/psycopg",
+    "operational JSON error reporting for municipal inspection failures",
+    "retained AI Knowledge Plane, bitemporality, hybrid retrieval foundation, evidence and high-risk gates"
+  ],
+  "externalGatesStillRequired": [
+    "generate package-lock.json in registry-connected environment",
+    "clean npm ci/typecheck/build",
+    "PostgreSQL/PostGIS runtime migrations 193-196 and RLS/cross-tenant tests",
+    "Docker runtime acceptance",
+    "OpenSearch + real embedding/model/reranker providers and retrieval/security evaluation",
+    "São Paulo live WFS ingestion/promotion and 10-20 human golden-lot cases",
+    "browser E2E/accessibility",
+    "staging/load/pentest/canary/backup-restore/DR"
+  ],
+  "nextMilestone": "Runtime homologation of core + São Paulo end-to-end; then A.I TEC advanced parking/TIN/Unit Solver and Solar imagery/DSM/shadow/tariff/OCR/calibration"
+}

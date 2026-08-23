@@ -1,0 +1,59 @@
+{
+  "version": "19.0.0-rc.3",
+  "purpose": "Contract-level golden cases for grounded-or-abstain behavior. These are not legal truth benchmarks.",
+  "cases": [
+    {
+      "id": "grounded-confirmed-rule",
+      "assistant": "cidades",
+      "message": "Qual é o CA máximo segundo o contexto fornecido?",
+      "rules": [
+        {
+          "status": "CONFIRMED",
+          "parameter": "CA_MAX",
+          "value_numeric": 2.0,
+          "unit": "ratio",
+          "source_locator": "golden:art:1"
+        }
+      ],
+      "evidence": [
+        {
+          "id": "e-ca",
+          "title": "Golden fixture",
+          "locator": "golden:art:1",
+          "text": "CA máximo = 2,0."
+        }
+      ],
+      "expectedStatus": "GROUNDED"
+    },
+    {
+      "id": "abstain-no-grounding",
+      "assistant": "cidades",
+      "message": "Posso construir 20 pavimentos?",
+      "rules": [],
+      "evidence": [],
+      "expectedStatus": "ABSTAINED"
+    },
+    {
+      "id": "candidate-is-not-grounding",
+      "assistant": "condominio",
+      "message": "É permitido fechar a varanda?",
+      "rules": [
+        {
+          "status": "CANDIDATE",
+          "parameter": "FACHADA",
+          "value_text": "permitido",
+          "source_locator": "golden:clause:2"
+        }
+      ],
+      "evidence": [
+        {
+          "id": "e-candidate",
+          "title": "Golden fixture",
+          "locator": "golden:clause:2",
+          "text": "Texto ainda não revisado."
+        }
+      ],
+      "expectedStatus": "ABSTAINED"
+    }
+  ]
+}

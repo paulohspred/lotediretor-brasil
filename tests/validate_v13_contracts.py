@@ -1,0 +1,6 @@
+from pathlib import Path
+import json,sys,yaml
+R=Path(__file__).resolve().parents[1];prod=(R/'docker-compose.production.yml').read_text();realm=json.loads((R/'infra/keycloak/templates/realm-lotediretor.production.json').read_text())
+checks={'version_v13':(R/'VERSION').read_text().strip()=='v13','prod_no_users':realm.get('users')==[],'prod_totp':any(x.get('alias')=='CONFIGURE_TOTP' and x.get('defaultAction') for x in realm.get('requiredActions',[])),'bruteforce':realm.get('bruteForceProtected') is True,'prod_no_dev_defaults':not any(x in prod for x in ['lotediretor_local','change-me-app','local-internal-change-me','local-lotediretor-secret']),'prod_env_blank_secrets':(R/'.env.production.example').exists(),'load_test':(R/'ops/load/k6-smoke.js').exists(),'canary':(R/'ops/release/canary-gate.sh').exists(),'lgpd':(R/'docs/legal/LGPD_RETENTION.md').exists(),'pentest':(R/'docs/security/PENTEST_SCOPE.md').exists(),'go_live':(R/'docs/ops/GO_LIVE_CHECKLIST.md').exists(),'ci_build':'npm run typecheck' in (R/'.github/workflows/ci.yml').read_text() and 'npm run build' in (R/'.github/workflows/ci.yml').read_text()}
+print(json.dumps(checks,indent=2));bad=[k for k,v in checks.items() if not v]
+if bad:print('FAILED',bad,file=sys.stderr);sys.exit(1)

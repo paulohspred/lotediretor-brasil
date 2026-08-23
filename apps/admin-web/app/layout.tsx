@@ -1,0 +1,1 @@
+import type {ReactNode} from 'react';import '@lotediretor/design-tokens/tokens.css';import '@lotediretor/ui/ui.css';import './admin.css';export const metadata={title:'LoteDiretor Admin'};export default function Layout({children}:{children:ReactNode}){return <html lang="pt-BR"><body>{children}</body></html>}

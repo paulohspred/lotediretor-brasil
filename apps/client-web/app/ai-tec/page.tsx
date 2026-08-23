@@ -1,0 +1,1 @@
+import {Shell} from '../../components/Shell';import {AitecWorkspace} from '../../components/workspaces/AitecWorkspace';export default function Page(){return <Shell><main className="page"><AitecWorkspace/></main></Shell>}

@@ -1,0 +1,23 @@
+{
+  "municipality_ibge": "3550308",
+  "status": "READY_FOR_CASE_SELECTION",
+  "minimum_cases": 10,
+  "target_cases": 20,
+  "rule": "Nenhum caso recebe PASS sem referência oficial, parcela confirmada, data-base, zona e parâmetros esperados revisados por humano.",
+  "required_case_fields": [
+    "case_code",
+    "input_kind",
+    "input_payload",
+    "expected_official_reference",
+    "expected_parameters"
+  ],
+  "coverage_targets": [
+    "zonas distintas",
+    "lote de esquina",
+    "lote com geometria irregular",
+    "interseção com camada especial quando disponível",
+    "data-base histórica quando houver versão anterior",
+    "caso sem cobertura suficiente para validar abstenção"
+  ],
+  "cases": []
+}

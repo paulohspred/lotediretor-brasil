@@ -1,0 +1,8 @@
+{
+  "name": "@lotediretor/design-tokens",
+  "version": "19.0.0-rc.3",
+  "private": true,
+  "exports": {
+    "./tokens.css": "./tokens.css"
+  }
+}

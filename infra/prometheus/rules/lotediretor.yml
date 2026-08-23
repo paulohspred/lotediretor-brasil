@@ -1,0 +1,13 @@
+groups:
+  - name: lotediretor-runtime
+    rules:
+      - alert: LoteDiretorServiceDown
+        expr: lotediretor_service_up == 0
+        for: 2m
+        labels: {severity: critical}
+        annotations: {summary: "LoteDiretor service/database unavailable"}
+      - alert: LoteDiretorTargetMissing
+        expr: up == 0
+        for: 2m
+        labels: {severity: critical}
+        annotations: {summary: "Prometheus target unavailable"}

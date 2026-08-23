@@ -1,0 +1,32 @@
+{
+  "name": "@lotediretor/control-api",
+  "version": "19.0.0-rc.3",
+  "private": true,
+  "scripts": {
+    "dev": "tsx watch src/main.ts",
+    "build": "tsc -p tsconfig.build.json",
+    "start": "node dist/main.js",
+    "typecheck": "tsc --noEmit -p tsconfig.build.json"
+  },
+  "dependencies": {
+    "@nestjs/common": "^11.0.0",
+    "@nestjs/core": "^11.0.0",
+    "@nestjs/platform-fastify": "^11.0.0",
+    "@fastify/cookie": "^11.0.0",
+    "fastify": "^5.0.0",
+    "mercurius": "^16.0.0",
+    "graphql": "^16.10.0",
+    "pg": "^8.13.0",
+    "ioredis": "^5.4.0",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.0",
+    "uuid": "^11.1.0",
+    "mercadopago": "^3.4.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.0",
+    "tsx": "^4.19.0",
+    "@types/node": "^22.0.0",
+    "@types/pg": "^8.11.0"
+  }
+}

@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "SourceRegistry",
+  "type": "object",
+  "required": [
+    "code",
+    "authority",
+    "accessClass",
+    "parserVersion"
+  ],
+  "properties": {
+    "code": {
+      "type": "string"
+    },
+    "authority": {
+      "type": "string"
+    },
+    "accessClass": {
+      "enum": [
+        "A",
+        "B",
+        "C",
+        "D",
+        "F"
+      ]
+    },
+    "parserVersion": {
+      "type": "string"
+    },
+    "cadence": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "licenseTerms": {
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  }
+}

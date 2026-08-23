@@ -1,0 +1,1 @@
+import {Shell} from '../../components/Shell';import {DashboardWorkspace} from '../../components/workspaces/DashboardWorkspace';export default function Page(){return <Shell><main className="page"><DashboardWorkspace/></main></Shell>}

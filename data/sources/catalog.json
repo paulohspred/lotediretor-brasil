@@ -1,0 +1,55 @@
+{
+  "version": 2,
+  "policy": "A source is ACTIVE only after provenance, license/access terms, immutable raw snapshot, quality gate and publication are recorded. A verified endpoint is not the same as ingested data.",
+  "sources": [
+    {
+      "code": "IBGE_LOCALIDADES",
+      "authority": "IBGE",
+      "accessClass": "A",
+      "integration": "ACTIVE_ADAPTER",
+      "purpose": "national municipality catalog",
+      "publication": "automatic only after blocking quality checks PASS",
+      "reference": "https://servicodados.ibge.gov.br/api/v1/localidades/municipios"
+    },
+    {
+      "code": "CAR",
+      "authority": "SICAR / competent environmental authority",
+      "accessClass": "B",
+      "integration": "ADAPTER_READY_ENDPOINT_NOT_CONFIGURED",
+      "purpose": "rural environmental registry",
+      "notes": "Do not activate a third-party mirror as official. Configure only a verified/licensed endpoint or controlled import."
+    },
+    {
+      "code": "SIGEF",
+      "authority": "INCRA",
+      "accessClass": "C",
+      "integration": "OFFICIAL_API_IDENTIFIED_REQUIRES_CONECTA_CREDENTIALS",
+      "purpose": "georeferenced parcels and land-registry evidence",
+      "reference": "https://www.gov.br/conecta/catalogo/apis/sigef-geo",
+      "productionApi": "https://apigateway.conectagov.estaleiro.serpro.gov.br/api-sigef-geo/v1/parcelas",
+      "notes": "Conecta access requires onboarding/credentials and network allow-listing. No credential is embedded."
+    },
+    {
+      "code": "IBAMA_EMBARGO",
+      "authority": "IBAMA",
+      "accessClass": "A",
+      "integration": "ADAPTER_READY_ENDPOINT_NOT_CONFIGURED",
+      "purpose": "environmental enforcement overlaps",
+      "reference": "https://dadosabertos.ibama.gov.br/dataset/termos-de-embargo",
+      "license": "ODbL",
+      "notes": "Official polygon dataset is SHP-ZIP under ODbL. Adapter converts the selected CKAN SHP-ZIP resource with GDAL; activation remains explicit and quality-gated.",
+      "adapterMode": "CKAN_SHP_ZIP_GDAL",
+      "operatorEndpointExample": "https://dadosabertos.ibama.gov.br/api/3/action/package_show?id=termos-de-embargo"
+    },
+    {
+      "code": "PRODES",
+      "authority": "INPE / TerraBrasilis",
+      "accessClass": "A",
+      "integration": "WFS_ADAPTER_READY_TYPENAME_NOT_PINNED",
+      "purpose": "deforestation/native vegetation suppression evidence",
+      "reference": "https://terrabrasilis.dpi.inpe.br/acesso-aos-dados/",
+      "wfsBase": "https://terrabrasilis.dpi.inpe.br/geoserver/ows",
+      "notes": "Official TerraBrasilis WFS base is identified. Exact current PRODES vector layer/typeName must be inspected, pinned and versioned before activation; no catch-all layer is assumed."
+    }
+  ]
+}

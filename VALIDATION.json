@@ -1,0 +1,39 @@
+{
+  "version": "v19-rc.3",
+  "runtimeVersion": "19.0.0-rc.3",
+  "validatedAtUtc": "2026-08-23T15:42:00Z",
+  "staticValidation": "PASS",
+  "productionHomologated": false,
+  "checks": [
+    "retained domain regressions",
+    "territorial/legal condition and conflict safety",
+    "AI Core/Knowledge Plane contracts",
+    "AI bitemporal retrieval and registries",
+    "São Paulo lab/publication/inspection tooling",
+    "A.I TEC hard constraints/site/parking/access-lock-branch/program-terrain-building",
+    "Solar RC3 electrical design contracts",
+    "Python compile",
+    "JSON/YAML parse",
+    "TypeScript/TSX syntax parse",
+    "shell syntax",
+    "runtime/package consistency",
+    "migration topology contracts",
+    "workspace/CI/release/UI drift guards"
+  ],
+  "notExecuted": [
+    "package-lock generation in registry-connected environment",
+    "clean npm ci/typecheck/build",
+    "Docker Compose E2E",
+    "PostgreSQL/PostGIS runtime migrations and RLS",
+    "OpenSearch + real embeddings/model provider integration",
+    "São Paulo live WFS ingestion/domain promotion/golden-lot human validation",
+    "browser E2E/accessibility",
+    "staging/load/pentest/canary/backup-restore/DR"
+  ],
+  "observedExternalBlockers": [
+    "GeoSampa live inspection reached HTTP client but DNS resolution was unavailable in this execution environment",
+    "Docker/PostgreSQL executables are not available in this execution environment"
+  ],
+  "fullValidator": "./validate-v19-rc3.sh",
+  "fullValidatorResult": "PASS"
+}

@@ -1,0 +1,11 @@
+{
+  "title": "LoteDiretor Platform Overview",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "panels": [
+    {"type":"stat","title":"Platform API up","targets":[{"expr":"lotediretor_service_up{service=\"platform-api\"}"}],"gridPos":{"h":6,"w":8,"x":0,"y":0}},
+    {"type":"stat","title":"Control API up","targets":[{"expr":"lotediretor_service_up{service=\"control-api\"}"}],"gridPos":{"h":6,"w":8,"x":8,"y":0}},
+    {"type":"stat","title":"Solar engine up","targets":[{"expr":"lotediretor_service_up{service=\"solar-engine\"}"}],"gridPos":{"h":6,"w":8,"x":16,"y":0}}
+  ]
+}

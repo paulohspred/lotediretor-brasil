@@ -1,0 +1,4 @@
+import type {ReactNode} from 'react';'use client';
+import {usePathname} from 'next/navigation';
+const nav=[['⌂','Dashboard','/app/dashboard'],['◫','Imóvel 360','/app/imovel-360'],['⌖','RE Rural','/app/re-rural'],['▤','Condomínio','/app/condominio'],['☀','Solar','/app/energia-solar'],['✦','A.I TEC','/app/ai-tec'],['🏛','Prefeitura','/app/prefeitura']];
+export function Shell({children}:{children:ReactNode}){const p=usePathname();return <div className="shell"><aside className="rail"><div className="railBrand">LD</div><nav className="railNav">{nav.map(([i,l,h])=><a key={h} className={`navItem ${p===h?'active':''}`} href={h}><span className="navIcon">{i}</span><span>{l}</span></a>)}</nav></aside><div className="content"><header className="topbar"><input className="search" placeholder="Buscar endereço, imóvel, CIB, município ou projeto…"/><div style={{fontSize:'.76rem',fontWeight:700}}>Workspace Local</div></header>{children}</div></div>}

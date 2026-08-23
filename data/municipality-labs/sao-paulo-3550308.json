@@ -1,0 +1,82 @@
+{
+  "municipality_ibge": "3550308",
+  "name": "São Paulo",
+  "uf": "SP",
+  "status": "CORE_LAYERS_MAPPED_PENDING_RUNTIME_SYNC",
+  "sources": [
+    {
+      "code": "SP_GEOSAMPA_WFS",
+      "authority": "Prefeitura de São Paulo",
+      "channel": "WFS",
+      "base_url": "https://wfs.geosampa.prefeitura.sp.gov.br/geoserver/geoportal/ows",
+      "datasets": [
+        {
+          "code": "PARCEL",
+          "typename": "geoportal:lote_cidadao",
+          "status": "MAPPED_PENDING_INGESTION",
+          "metadata_uuid": "62c1113c-36a4-43d1-b763-81ec63b58116",
+          "metadata_url": "https://metadados.geosampa.prefeitura.sp.gov.br/geonetwork/srv/api/records/62c1113c-36a4-43d1-b763-81ec63b58116",
+          "native_crs": "EPSG:31983",
+          "requested_crs": "EPSG:4326",
+          "update_frequency": "DAILY",
+          "source_revision": "2026-07-15",
+          "target_layer_code": "SP_GEOSAMPA_PARCEL",
+          "domain": "CADASTRE"
+        },
+        {
+          "code": "ZONEAMENTO",
+          "typename": "geoportal:perimetro_zona_lei_18177_24",
+          "status": "MAPPED_PENDING_INGESTION",
+          "metadata_uuid": "afc0cff0-933f-4bd1-8269-cf4ac3762571",
+          "metadata_url": "https://metadados.geosampa.prefeitura.sp.gov.br/geonetwork/srv/api/records/afc0cff0-933f-4bd1-8269-cf4ac3762571",
+          "law": "18.177/2024",
+          "native_crs": "EPSG:31983",
+          "requested_crs": "EPSG:4326",
+          "update_frequency": "NOT_PLANNED",
+          "source_revision": "2025-03-28",
+          "target_layer_code": "SP_GEOSAMPA_ZONE_18177_2024",
+          "domain": "PLANNING"
+        },
+        {
+          "code": "MUNICIPAL_GIS",
+          "typename": null,
+          "status": "CATALOG_MAPPING_REQUIRED",
+          "note": "Remaining GeoSampa layers must be onboarded individually with metadata/licence/geometry contract; there is no safe generic catch-all layer."
+        }
+      ],
+      "activation_rule": "A layer is not ingestible until its exact WFS typeName, metadata, license/terms and geometry contract are reviewed.",
+      "license": "CC-BY-SA-4.0",
+      "license_url": "https://prefeitura.sp.gov.br/web/licenciamento/w/licen%C3%A7a-para-uso-de-dados-do-geosampa"
+    },
+    {
+      "code": "SP_LEGISLACAO_PDE",
+      "authority": "Prefeitura de São Paulo",
+      "channel": "HTML",
+      "base_url": "https://legislacao.prefeitura.sp.gov.br/lei-16050-de-31-de-julho-de-2014/consolidado",
+      "datasets": [
+        {
+          "code": "PLANO_DIRETOR",
+          "law": "16.050/2014",
+          "status": "DISCOVERED"
+        }
+      ],
+      "activation_rule": "Original/consolidated text and amendments must be snapshotted, hashed and reviewed before rules become CONFIRMED."
+    }
+  ],
+  "manual_acceptance": {
+    "test_lots": 10,
+    "required": [
+      "official parcel geometry",
+      "zone geometry",
+      "law/document version",
+      "confirmed urban parameters",
+      "reproducible analysis",
+      "evidence report"
+    ]
+  },
+  "reviewed_at": "2026-08-23",
+  "review_notes": [
+    "GeoSampa parcel and current zoning layer names were mapped from official PMSP GeoNetwork/GeoSampa metadata.",
+    "Mapping does not equal ingestion/homologation; runtime sync + QA + human golden-lot validation remain mandatory."
+  ]
+}

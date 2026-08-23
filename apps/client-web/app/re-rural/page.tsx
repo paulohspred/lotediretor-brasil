@@ -1,0 +1,1 @@
+import {Shell} from '../../components/Shell';import {RuralWorkspace} from '../../components/workspaces/RuralWorkspace';export default function Page(){return <Shell><main className="page"><RuralWorkspace/></main></Shell>}

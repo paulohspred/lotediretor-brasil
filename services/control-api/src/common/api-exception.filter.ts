@@ -1,0 +1,6 @@
+import {ArgumentsHost,Catch,ExceptionFilter,HttpException,HttpStatus} from '@nestjs/common';
+function msg(v:unknown){if(typeof v==='string')return v;if(Array.isArray(v))return v.join('; ');if(v&&typeof v==='object'){const x=v as any;if(typeof x.message==='string')return x.message;if(Array.isArray(x.message))return x.message.join('; ');if(typeof x.error==='string')return x.error;}return'internal_error';}
+@Catch()
+export class ApiExceptionFilter implements ExceptionFilter{
+  catch(exception:unknown,host:ArgumentsHost){const ctx=host.switchToHttp();const res:any=ctx.getResponse();const req:any=ctx.getRequest();const status=exception instanceof HttpException?exception.getStatus():HttpStatus.INTERNAL_SERVER_ERROR;const body=exception instanceof HttpException?exception.getResponse():null;const message=msg(body||((exception as any)?.message));const code=(body&&typeof body==='object'&&typeof (body as any).code==='string')?(body as any).code:message.toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_|_$/g,'').slice(0,96)||'internal_error';res.status(status).send({code,message,trace_id:String(req?.traceId||req?.requestId||req?.id||'')||null,retryable:status===408||status===409||status===425||status===429||status>=500});}
+}

@@ -1,0 +1,592 @@
+services:
+  platform-db:
+    image: postgis/postgis:18-3.6
+    environment:
+      POSTGRES_USER: ${PLATFORM_DB_MIGRATION_USER:-lotediretor}
+      POSTGRES_PASSWORD: ${PLATFORM_DB_MIGRATION_PASSWORD:-lotediretor_local}
+      POSTGRES_DB: ${PLATFORM_DB_NAME:-lotediretor}
+    volumes:
+    - platform_pgdata:/var/lib/postgresql
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - pg_isready -U ${PLATFORM_DB_MIGRATION_USER:-lotediretor} -d ${PLATFORM_DB_NAME:-lotediretor}
+      interval: 5s
+      timeout: 5s
+      retries: 20
+  platform-db-role-init:
+    image: postgres:18
+    environment:
+      PLATFORM_DB_MIGRATION_USER: ${PLATFORM_DB_MIGRATION_USER:-lotediretor}
+      PLATFORM_DB_MIGRATION_PASSWORD: ${PLATFORM_DB_MIGRATION_PASSWORD:-lotediretor_local}
+      PLATFORM_DB_NAME: ${PLATFORM_DB_NAME:-lotediretor}
+      PLATFORM_DB_APP_PASSWORD: ${PLATFORM_DB_APP_PASSWORD:-change-me-app}
+      PLATFORM_DB_TILES_PASSWORD: ${PLATFORM_DB_TILES_PASSWORD:-change-me-tiles}
+      CONTROL_DB_MIGRATION_USER: ${CONTROL_DB_MIGRATION_USER:-lotediretor_control}
+      CONTROL_DB_MIGRATION_PASSWORD: ${CONTROL_DB_MIGRATION_PASSWORD:-lotediretor_control_local}
+      CONTROL_DB_NAME: ${CONTROL_DB_NAME:-lotediretor_control}
+      CONTROL_DB_APP_PASSWORD: ${CONTROL_DB_APP_PASSWORD:-change-me-control-app}
+      PLATFORM_DB_EVENT_PASSWORD: ${PLATFORM_DB_EVENT_PASSWORD:-change-me-events}
+      PLATFORM_DB_WORKER_PASSWORD: ${PLATFORM_DB_WORKER_PASSWORD:-change-me-worker}
+      CONTROL_DB_WORKER_PASSWORD: ${CONTROL_DB_WORKER_PASSWORD:-change-me-control-worker}
+    volumes:
+    - ./ops/db/bootstrap-runtime-roles.sh:/bootstrap-runtime-roles.sh:ro
+    entrypoint:
+    - /bin/bash
+    - /bootstrap-runtime-roles.sh
+    depends_on:
+      platform-migrate:
+        condition: service_completed_successfully
+      control-migrate:
+        condition: service_completed_successfully
+    restart: 'no'
+  control-db:
+    image: postgres:18
+    environment:
+      POSTGRES_USER: ${CONTROL_DB_MIGRATION_USER:-lotediretor_control}
+      POSTGRES_PASSWORD: ${CONTROL_DB_MIGRATION_PASSWORD:-lotediretor_control_local}
+      POSTGRES_DB: ${CONTROL_DB_NAME:-lotediretor_control}
+    volumes:
+    - control_pgdata:/var/lib/postgresql
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - pg_isready -U ${CONTROL_DB_MIGRATION_USER:-lotediretor_control} -d ${CONTROL_DB_NAME:-lotediretor_control}
+      interval: 5s
+      timeout: 5s
+      retries: 20
+  valkey:
+    image: valkey/valkey:8-alpine
+    command:
+    - valkey-server
+    - --appendonly
+    - 'yes'
+    volumes:
+    - valkey_data:/data
+  nats:
+    image: nats:2.11-alpine
+    command:
+    - -js
+    - -sd
+    - /data
+    volumes:
+    - nats_data:/data
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${S3_ACCESS_KEY:-lotediretor}
+      MINIO_ROOT_PASSWORD: ${S3_SECRET_KEY:-lotediretor-local-secret}
+    ports:
+    - 9001:9001
+    volumes:
+    - minio_data:/data
+    healthcheck:
+      test:
+      - CMD
+      - curl
+      - -f
+      - http://localhost:9000/minio/health/live
+      interval: 5s
+      timeout: 5s
+      retries: 20
+  minio-init:
+    image: minio/mc:latest
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: /bin/sh -c "mc alias set local http://minio:9000 ${S3_ACCESS_KEY:-lotediretor}
+      ${S3_SECRET_KEY:-lotediretor-local-secret} && mc mb --ignore-existing local/${S3_BUCKET:-lotediretor}
+      && mc anonymous set none local/${S3_BUCKET:-lotediretor}"
+    restart: 'no'
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.2
+    command: start-dev --import-realm
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN:-admin}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin}
+    ports:
+    - 8081:8080
+    volumes:
+    - ./infra/keycloak/realm-lotediretor.json:/opt/keycloak/data/import/realm-lotediretor.json:ro
+    - ./infra/keycloak/themes/lotediretor:/opt/keycloak/themes/lotediretor:ro
+  platform-api:
+    build:
+      context: .
+      dockerfile: services/platform-api/Dockerfile
+    environment:
+      PORT: 3001
+      PLATFORM_DATABASE_URL: postgresql://${PLATFORM_DB_APP_USER:-lotediretor_app}:${PLATFORM_DB_APP_PASSWORD:-change-me-app}@platform-db:5432/${PLATFORM_DB_NAME:-lotediretor}
+      PLATFORM_MIGRATION_DATABASE_URL: postgresql://${PLATFORM_DB_MIGRATION_USER:-lotediretor}:${PLATFORM_DB_MIGRATION_PASSWORD:-lotediretor_local}@platform-db:5432/${PLATFORM_DB_NAME:-lotediretor}
+      VALKEY_URL: ${VALKEY_URL:-redis://valkey:6379/0}
+      KEYCLOAK_PUBLIC_ISSUER: ${KEYCLOAK_PUBLIC_ISSUER:-http://localhost:8081/realms/lotediretor}
+      KEYCLOAK_INTERNAL_ISSUER: ${KEYCLOAK_INTERNAL_ISSUER:-http://keycloak:8080/realms/lotediretor}
+      OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:-lotediretor-app}
+      OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:-local-lotediretor-secret}
+      OIDC_REDIRECT_URI: ${OIDC_REDIRECT_URI:-http://localhost:8080/api/v1/auth/callback}
+      SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:-false}
+      ALLOW_LOCAL_AUTO_MEMBERSHIP: ${ALLOW_LOCAL_AUTO_MEMBERSHIP:-true}
+      INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN:-local-internal-change-me}
+      AI_GATEWAY_INTERNAL_URL: ${AI_GATEWAY_INTERNAL_URL:-http://ai-gateway:3003}
+      SOLAR_ENGINE_INTERNAL_URL: ${SOLAR_ENGINE_INTERNAL_URL:-http://solar-engine:8001}
+      AITEC_ENGINE_INTERNAL_URL: ${AITEC_ENGINE_INTERNAL_URL:-http://aitec-engine:8002}
+      S3_ENDPOINT: ${S3_ENDPOINT:-http://minio:9000}
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY:-lotediretor}
+      S3_SECRET_KEY: ${S3_SECRET_KEY:-lotediretor-local-secret}
+      S3_BUCKET: ${S3_BUCKET:-lotediretor}
+      S3_REGION: ${S3_REGION:-us-east-1}
+      MAX_UPLOAD_BYTES: ${MAX_UPLOAD_BYTES:-26214400}
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-http://otel-collector:4318}
+      RUN_MIGRATIONS_ON_START: 'false'
+    depends_on:
+      platform-db:
+        condition: service_healthy
+      platform-db-role-init:
+        condition: service_completed_successfully
+      valkey:
+        condition: service_started
+      keycloak:
+        condition: service_started
+      minio-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+      - CMD
+      - node
+      - -e
+      - fetch('http://localhost:3001/api/v1/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))
+      interval: 10s
+      timeout: 5s
+      retries: 12
+  control-api:
+    build:
+      context: .
+      dockerfile: services/control-api/Dockerfile
+    environment:
+      PORT: 3002
+      CONTROL_DATABASE_URL: postgresql://${CONTROL_DB_APP_USER:-lotediretor_control_app}:${CONTROL_DB_APP_PASSWORD:-change-me-control-app}@control-db:5432/${CONTROL_DB_NAME:-lotediretor_control}
+      CONTROL_MIGRATION_DATABASE_URL: postgresql://${CONTROL_DB_MIGRATION_USER:-lotediretor_control}:${CONTROL_DB_MIGRATION_PASSWORD:-lotediretor_control_local}@control-db:5432/${CONTROL_DB_NAME:-lotediretor_control}
+      VALKEY_URL: ${VALKEY_URL:-redis://valkey:6379/0}
+      INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN:-local-internal-change-me}
+      PLATFORM_INTERNAL_URL: ${PLATFORM_INTERNAL_URL:-http://platform-api:3001}
+      MERCADOPAGO_WEBHOOK_SECRET: ${MERCADOPAGO_WEBHOOK_SECRET:-}
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-http://otel-collector:4318}
+      RUN_MIGRATIONS_ON_START: 'false'
+    depends_on:
+      control-db:
+        condition: service_healthy
+      platform-db-role-init:
+        condition: service_completed_successfully
+      valkey:
+        condition: service_started
+      platform-api:
+        condition: service_healthy
+    healthcheck:
+      test:
+      - CMD
+      - node
+      - -e
+      - fetch('http://localhost:3002/control/v1/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))
+      interval: 10s
+      timeout: 5s
+      retries: 12
+  ai-gateway:
+    build:
+      context: .
+      dockerfile: services/ai-gateway/Dockerfile
+    environment:
+      PORT: 3003
+      AI_BASE_URL: ${AI_BASE_URL:-}
+      AI_CHAT_ENDPOINT: ${AI_CHAT_ENDPOINT:-}
+      AI_API_KEY: ${AI_API_KEY:-}
+      AI_MODEL: ${AI_MODEL:-}
+      AI_TIMEOUT_MS: ${AI_TIMEOUT_MS:-30000}
+      AI_EMBEDDINGS_ENDPOINT: ${AI_EMBEDDINGS_ENDPOINT:-}
+      AI_EMBEDDINGS_MODEL: ${AI_EMBEDDINGS_MODEL:-}
+      AI_EMBEDDINGS_API_KEY: ${AI_EMBEDDINGS_API_KEY:-}
+      AI_EMBEDDINGS_DIMENSION: ${AI_EMBEDDINGS_DIMENSION:-1536}
+      AI_EMBEDDINGS_TIMEOUT_MS: ${AI_EMBEDDINGS_TIMEOUT_MS:-20000}
+      OPENSEARCH_URL: ${OPENSEARCH_URL:-http://opensearch:9200}
+      OPENSEARCH_EVIDENCE_INDEX: ${OPENSEARCH_EVIDENCE_INDEX:-lotediretor-evidence-v3}
+      OPENSEARCH_USERNAME: ${OPENSEARCH_USERNAME:-}
+      OPENSEARCH_PASSWORD: ${OPENSEARCH_PASSWORD:-}
+      INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN:-local-internal-change-me}
+      CONTROL_INTERNAL_URL: ${CONTROL_INTERNAL_URL:-http://control-api:3002}
+    depends_on:
+      control-api:
+        condition: service_healthy
+      opensearch:
+        condition: service_started
+    healthcheck:
+      test:
+      - CMD
+      - node
+      - -e
+      - fetch('http://localhost:3003/ai/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))
+      interval: 10s
+      timeout: 5s
+      retries: 12
+  solar-engine:
+    build:
+      context: .
+      dockerfile: services/solar-engine/Dockerfile
+    environment:
+      INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN:-local-internal-change-me}
+    healthcheck:
+      test:
+      - CMD
+      - python
+      - -c
+      - import urllib.request; urllib.request.urlopen('http://localhost:8001/solar/health',
+        timeout=3)
+      interval: 10s
+      timeout: 5s
+      retries: 12
+  aitec-engine:
+    build:
+      context: .
+      dockerfile: services/aitec-engine/Dockerfile
+    environment:
+      INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN:-local-internal-change-me}
+    healthcheck:
+      test:
+      - CMD
+      - python
+      - -c
+      - import urllib.request; urllib.request.urlopen('http://localhost:8002/aitec/health',
+        timeout=3)
+      interval: 10s
+      timeout: 5s
+      retries: 12
+  martin:
+    image: ghcr.io/maplibre/martin:1.12.0
+    command:
+    - --config
+    - /config.yaml
+    environment:
+      DATABASE_URL: postgresql://${PLATFORM_DB_TILES_USER:-lotediretor_tiles}:${PLATFORM_DB_TILES_PASSWORD:-change-me-tiles}@platform-db:5432/${PLATFORM_DB_NAME:-lotediretor}
+    volumes:
+    - ./infra/martin/config.yaml:/config.yaml:ro
+    depends_on:
+      platform-db:
+        condition: service_healthy
+      platform-db-role-init:
+        condition: service_completed_successfully
+  geo-worker:
+    build:
+      context: .
+      dockerfile: workers/geo/Dockerfile
+    environment:
+      PLATFORM_DATABASE_URL: postgresql://lotediretor_worker:${PLATFORM_DB_WORKER_PASSWORD:-change-me-worker}@platform-db:5432/${PLATFORM_DB_NAME:-lotediretor}
+      GEO_QUALITY_INTERVAL_SECONDS: ${GEO_QUALITY_INTERVAL_SECONDS:-3600}
+    depends_on:
+      platform-db:
+        condition: service_healthy
+      platform-db-role-init:
+        condition: service_completed_successfully
+  document-worker:
+    build:
+      context: .
+      dockerfile: workers/documents/Dockerfile
+    environment:
+      PLATFORM_DATABASE_URL: postgresql://lotediretor_worker:${PLATFORM_DB_WORKER_PASSWORD:-change-me-worker}@platform-db:5432/${PLATFORM_DB_NAME:-lotediretor}
+      S3_ENDPOINT: ${S3_ENDPOINT:-http://minio:9000}
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY:-lotediretor}
+      S3_SECRET_KEY: ${S3_SECRET_KEY:-lotediretor-local-secret}
+      S3_BUCKET: ${S3_BUCKET:-lotediretor}
+      S3_REGION: ${S3_REGION:-us-east-1}
+    depends_on:
+      platform-db:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+      platform-db-role-init:
+        condition: service_completed_successfully
+  report-worker:
+    build:
+      context: .
+      dockerfile: workers/reports/Dockerfile
+    environment:
+      PLATFORM_DATABASE_URL: postgresql://lotediretor_worker:${PLATFORM_DB_WORKER_PASSWORD:-change-me-worker}@platform-db:5432/${PLATFORM_DB_NAME:-lotediretor}
+      S3_ENDPOINT: ${S3_ENDPOINT:-http://minio:9000}
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY:-lotediretor}
+      S3_SECRET_KEY: ${S3_SECRET_KEY:-lotediretor-local-secret}
+      S3_BUCKET: ${S3_BUCKET:-lotediretor}
+      S3_REGION: ${S3_REGION:-us-east-1}
+    depends_on:
+      platform-db:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+      platform-db-role-init:
+        condition: service_completed_successfully
+  rural-monitor-worker:
+    build:
+      context: .
+      dockerfile: workers/rural-monitor/Dockerfile
+    environment:
+      PLATFORM_DATABASE_URL: postgresql://lotediretor_worker:${PLATFORM_DB_WORKER_PASSWORD:-change-me-worker}@platform-db:5432/${PLATFORM_DB_NAME:-lotediretor}
+      RURAL_MONITOR_INTERVAL_SECONDS: ${RURAL_MONITOR_INTERVAL_SECONDS:-900}
+    depends_on:
+      platform-db:
+        condition: service_healthy
+      platform-db-role-init:
+        condition: service_completed_successfully
+  rural-export-worker:
+    build:
+      context: .
+      dockerfile: workers/rural-export/Dockerfile
+    environment:
+      PLATFORM_DATABASE_URL: postgresql://lotediretor_worker:${PLATFORM_DB_WORKER_PASSWORD:-change-me-worker}@platform-db:5432/${PLATFORM_DB_NAME:-lotediretor}
+      S3_ENDPOINT: ${S3_ENDPOINT:-http://minio:9000}
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY:-lotediretor}
+      S3_SECRET_KEY: ${S3_SECRET_KEY:-lotediretor-local-secret}
+      S3_BUCKET: ${S3_BUCKET:-lotediretor}
+      S3_REGION: ${S3_REGION:-us-east-1}
+    depends_on:
+      platform-db:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+      platform-db-role-init:
+        condition: service_completed_successfully
+  billing-worker:
+    build:
+      context: .
+      dockerfile: workers/billing/Dockerfile
+    environment:
+      CONTROL_DATABASE_URL: postgresql://lotediretor_control_worker:${CONTROL_DB_WORKER_PASSWORD:-change-me-control-worker}@control-db:5432/${CONTROL_DB_NAME:-lotediretor_control}
+      PLATFORM_DATABASE_URL: postgresql://lotediretor_worker:${PLATFORM_DB_WORKER_PASSWORD:-change-me-worker}@platform-db:5432/${PLATFORM_DB_NAME:-lotediretor}
+      MERCADO_PAGO_ACCESS_TOKEN: ${MERCADO_PAGO_ACCESS_TOKEN:-}
+    depends_on:
+      control-db:
+        condition: service_healthy
+      platform-db:
+        condition: service_healthy
+      platform-db-role-init:
+        condition: service_completed_successfully
+  data-pipelines:
+    build:
+      context: .
+      dockerfile: workers/data-pipelines/Dockerfile
+    environment:
+      PLATFORM_DATABASE_URL: postgresql://lotediretor_worker:${PLATFORM_DB_WORKER_PASSWORD:-change-me-worker}@platform-db:5432/${PLATFORM_DB_NAME:-lotediretor}
+      IBGE_SYNC_INTERVAL_SECONDS: ${IBGE_SYNC_INTERVAL_SECONDS:-86400}
+      S3_ENDPOINT: ${S3_ENDPOINT:-http://minio:9000}
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY:-lotediretor}
+      S3_SECRET_KEY: ${S3_SECRET_KEY:-lotediretor-local-secret}
+      S3_BUCKET: ${S3_BUCKET:-lotediretor}
+      S3_REGION: ${S3_REGION:-us-east-1}
+      CAR_SOURCE_URL: ${CAR_SOURCE_URL:-}
+      SIGEF_SOURCE_URL: ${SIGEF_SOURCE_URL:-}
+      IBAMA_EMBARGO_SOURCE_URL: ${IBAMA_EMBARGO_SOURCE_URL:-}
+      PRODES_SOURCE_URL: ${PRODES_SOURCE_URL:-}
+    depends_on:
+      platform-db:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+      platform-db-role-init:
+        condition: service_completed_successfully
+  ai-ingest:
+    profiles:
+    - full
+    build:
+      context: .
+      dockerfile: workers/ai-ingest/Dockerfile
+    environment:
+      PLATFORM_DATABASE_URL: postgresql://lotediretor_worker:${PLATFORM_DB_WORKER_PASSWORD:-change-me-worker}@platform-db:5432/${PLATFORM_DB_NAME:-lotediretor}
+      OPENSEARCH_URL: ${OPENSEARCH_URL:-http://opensearch:9200}
+      OPENSEARCH_EVIDENCE_INDEX: ${OPENSEARCH_EVIDENCE_INDEX:-lotediretor-evidence-v3}
+      OPENSEARCH_USERNAME: ${OPENSEARCH_USERNAME:-}
+      OPENSEARCH_PASSWORD: ${OPENSEARCH_PASSWORD:-}
+      AI_EMBEDDINGS_ENDPOINT: ${AI_EMBEDDINGS_ENDPOINT:-}
+      AI_EMBEDDINGS_MODEL: ${AI_EMBEDDINGS_MODEL:-}
+      AI_EMBEDDINGS_API_KEY: ${AI_EMBEDDINGS_API_KEY:-}
+      AI_EMBEDDINGS_DIMENSION: ${AI_EMBEDDINGS_DIMENSION:-1536}
+      AI_EMBEDDINGS_TIMEOUT_SECONDS: ${AI_EMBEDDINGS_TIMEOUT_SECONDS:-20}
+    depends_on:
+      platform-db:
+        condition: service_healthy
+      opensearch:
+        condition: service_started
+      platform-db-role-init:
+        condition: service_completed_successfully
+  site-web:
+    build:
+      context: .
+      dockerfile: apps/site-web/Dockerfile
+    environment:
+      CONTROL_INTERNAL_URL: ${CONTROL_INTERNAL_URL:-http://control-api:3002}
+    depends_on:
+    - control-api
+  client-web:
+    build:
+      context: .
+      dockerfile: apps/client-web/Dockerfile
+  admin-web:
+    build:
+      context: .
+      dockerfile: apps/admin-web/Dockerfile
+  gateway:
+    image: caddy:2.9-alpine
+    ports:
+    - ${HTTP_PORT:-8080}:8080
+    volumes:
+    - ./infra/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+    depends_on:
+    - site-web
+    - client-web
+    - admin-web
+    - platform-api
+    - control-api
+    - ai-gateway
+    - solar-engine
+    - aitec-engine
+    - martin
+  opensearch:
+    profiles:
+    - full
+    image: opensearchproject/opensearch:2.19.1
+    environment:
+      discovery.type: single-node
+      plugins.security.disabled: 'true'
+      OPENSEARCH_JAVA_OPTS: -Xms512m -Xmx512m
+    ports:
+    - 9200:9200
+    volumes:
+    - opensearch_data:/usr/share/opensearch/data
+  prometheus:
+    profiles:
+    - ops
+    image: prom/prometheus:v3.5.0
+    command:
+    - --config.file=/etc/prometheus/prometheus.yml
+    - --storage.tsdb.path=/prometheus
+    volumes:
+    - ./infra/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    - prometheus_data:/prometheus
+    - ./infra/prometheus/rules:/etc/prometheus/rules:ro
+    ports:
+    - 127.0.0.1:${PROMETHEUS_PORT:-9090}:9090
+    depends_on:
+    - platform-api
+    - control-api
+    - solar-engine
+    - aitec-engine
+    - alertmanager
+  grafana:
+    profiles:
+    - ops
+    image: grafana/grafana:12.1.0
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-change-me-local}
+      GF_USERS_ALLOW_SIGN_UP: 'false'
+    volumes:
+    - ./infra/grafana/provisioning:/etc/grafana/provisioning:ro
+    - ./infra/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    - grafana_data:/var/lib/grafana
+    ports:
+    - 127.0.0.1:${GRAFANA_PORT:-3005}:3000
+    depends_on:
+    - prometheus
+  otel-collector:
+    profiles:
+    - ops
+    image: otel/opentelemetry-collector-contrib:0.132.0
+    command:
+    - --config=/etc/otelcol/config.yaml
+    volumes:
+    - ./infra/otel/collector.yaml:/etc/otelcol/config.yaml:ro
+    depends_on:
+    - tempo
+  tempo:
+    profiles:
+    - ops
+    image: grafana/tempo:2.8.2
+    command:
+    - -config.file=/etc/tempo.yaml
+    volumes:
+    - ./infra/tempo/tempo.yaml:/etc/tempo.yaml:ro
+    - tempo_data:/var/tempo
+  loki:
+    profiles:
+    - ops
+    image: grafana/loki:3.5.3
+    command:
+    - -config.file=/etc/loki/local-config.yaml
+    volumes:
+    - ./infra/loki/loki.yaml:/etc/loki/local-config.yaml:ro
+    - loki_data:/loki
+  promtail:
+    profiles:
+    - ops
+    image: grafana/promtail:3.5.3
+    command:
+    - -config.file=/etc/promtail/config.yml
+    volumes:
+    - ./infra/promtail/promtail.yaml:/etc/promtail/config.yml:ro
+    - /var/run/docker.sock:/var/run/docker.sock:ro
+    depends_on:
+    - loki
+  alertmanager:
+    profiles:
+    - ops
+    image: prom/alertmanager:v0.28.1
+    command:
+    - --config.file=/etc/alertmanager/alertmanager.yml
+    volumes:
+    - ./infra/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+  event-dispatcher:
+    build:
+      context: .
+      dockerfile: services/event-dispatcher/Dockerfile
+    environment:
+      PLATFORM_EVENT_DATABASE_URL: postgresql://lotediretor_event_dispatcher:${PLATFORM_DB_EVENT_PASSWORD:-change-me-events}@platform-db:5432/${PLATFORM_DB_NAME:-lotediretor}
+      NATS_URL: ${NATS_URL:-nats://nats:4222}
+      EVENT_BATCH_SIZE: ${EVENT_BATCH_SIZE:-50}
+      EVENT_POLL_MS: ${EVENT_POLL_MS:-1000}
+    depends_on:
+      platform-db-role-init:
+        condition: service_completed_successfully
+      nats:
+        condition: service_started
+    restart: unless-stopped
+  platform-migrate:
+    build:
+      context: .
+      dockerfile: services/platform-api/Dockerfile
+    command:
+    - node
+    - services/platform-api/dist/migrate.js
+    environment:
+      PLATFORM_MIGRATION_DATABASE_URL: postgresql://${PLATFORM_DB_MIGRATION_USER:-lotediretor}:${PLATFORM_DB_MIGRATION_PASSWORD:-lotediretor_local}@platform-db:5432/${PLATFORM_DB_NAME:-lotediretor}
+    depends_on:
+      platform-db:
+        condition: service_healthy
+    restart: 'no'
+  control-migrate:
+    build:
+      context: .
+      dockerfile: services/control-api/Dockerfile
+    command:
+    - node
+    - services/control-api/dist/migrate.js
+    environment:
+      CONTROL_MIGRATION_DATABASE_URL: postgresql://${CONTROL_DB_MIGRATION_USER:-lotediretor_control}:${CONTROL_DB_MIGRATION_PASSWORD:-lotediretor_control_local}@control-db:5432/${CONTROL_DB_NAME:-lotediretor_control}
+    depends_on:
+      control-db:
+        condition: service_healthy
+    restart: 'no'
+volumes:
+  platform_pgdata: null
+  control_pgdata: null
+  valkey_data: null
+  nats_data: null
+  minio_data: null
+  opensearch_data: null
+  prometheus_data: null
+  grafana_data: null
+  tempo_data: null
+  loki_data: null

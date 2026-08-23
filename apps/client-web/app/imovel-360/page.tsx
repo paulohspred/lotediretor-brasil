@@ -1,0 +1,1 @@
+import {Shell} from '../../components/Shell';import {Imovel360Workspace} from '../../components/workspaces/Imovel360Workspace';export default function Page(){return <Shell><main className="page"><Imovel360Workspace/></main></Shell>}

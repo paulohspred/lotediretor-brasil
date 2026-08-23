@@ -1,0 +1,1 @@
+import {AdminShell} from '../../components/AdminShell';import {AdminData} from '../../components/AdminData';export default function Page(){return <AdminShell><AdminData title="CMS / Site" endpoint="/control/v1/cms/pages"/></AdminShell>}

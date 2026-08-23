@@ -1,0 +1,26 @@
+{
+  "from": "v19-rc.2",
+  "to": "v19-rc.3",
+  "scope": "A.I TEC access/branch/program/terrain/building + Solar electrical + municipal inspection tooling",
+  "added": [
+    "explicit access road conceptual geometry",
+    "solution geometry locks and parent branching/regeneration",
+    "unit mix program gate",
+    "terrain-sample cut/fill estimate",
+    "preliminary building stack/core/circulation",
+    "solution GeoJSON and CSV exports",
+    "A.I TEC analysis_result persistence and tenant-consistent composite relationships",
+    "Solar explicit-datasheet string/MPPT solver",
+    "Solar regulation NULL uniqueness fix",
+    "São Paulo inspect-wfs lazy DB dependencies and JSON operational errors"
+  ],
+  "notClaimed": [
+    "production homologation",
+    "road engineering/radii/emergency design",
+    "basement parking/ramps/columns",
+    "TIN/geotechnical earthworks",
+    "full Unit Solver/floor plans/BIM",
+    "Solar DSM/3D calibrated shading/structural/grid approval",
+    "live São Paulo ingestion or human golden-lot approval"
+  ]
+}

@@ -1,0 +1,1 @@
+import {Shell} from '../../components/Shell';import {PrefeituraWorkspace} from '../../components/workspaces/PrefeituraWorkspace';export default function Page(){return <Shell><main className="page"><PrefeituraWorkspace/></main></Shell>}

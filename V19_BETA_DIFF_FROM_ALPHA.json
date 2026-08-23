@@ -1,0 +1,42 @@
+{
+  "from": "19.0.0-alpha.1",
+  "to": "19.0.0-beta.1",
+  "createdAtUtc": "2026-08-23T11:48:40Z",
+  "changes": {
+    "legal": [
+      "executable conditions separated from parser provenance",
+      "source_article_id provenance",
+      "condition evaluator MATCH/NO_MATCH/UNKNOWN",
+      "conditional calculations and NEEDS_REVIEW on unknown context",
+      "zone use permission schema and effective-use endpoint"
+    ],
+    "ai": [
+      "baseDate validity filters",
+      "RRF plus deterministic term rerank",
+      "strict provider evidence allowlist",
+      "conditional rule grounding requires evaluated MATCH",
+      "valid_from/valid_to indexed from document version"
+    ],
+    "data": [
+      "generic connector modes corrected",
+      "SIGEF/Conecta excluded from unauthenticated generic geospatial ingestion",
+      "coordinate range quality gate",
+      "WFS capabilities discovery tool",
+      "São Paulo golden-lot candidate selector"
+    ],
+    "release": [
+      "runtime/workspace version 19.0.0-beta.1",
+      "CI and release gate use validate-v19-beta.sh",
+      "current UI beta labels",
+      "status/validation/progress/checkpoint refreshed"
+    ]
+  },
+  "notClaimed": [
+    "production homologation",
+    "live São Paulo ingestion",
+    "real embeddings evaluation",
+    "npm reproducible build",
+    "Docker E2E",
+    "pentest/canary/DR"
+  ]
+}

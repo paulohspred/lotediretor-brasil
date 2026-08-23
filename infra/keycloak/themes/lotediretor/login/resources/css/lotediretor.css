@@ -1,0 +1,8 @@
+:root{--ld-green:#356854;--ld-deep:#1F4035;--ld-black:#111827;--ld-border:#e5e7eb}
+body{background:linear-gradient(135deg,#07120f,#17362b)!important;font-family:Inter,system-ui,sans-serif!important}
+.pf-v5-c-login__container,.login-pf-page{background:transparent!important}
+.pf-v5-c-card,.card-pf{border:0!important;border-radius:18px!important;box-shadow:0 18px 50px rgba(0,0,0,.22)!important}
+#kc-header-wrapper{color:#fff!important;font-weight:800!important;letter-spacing:-.03em!important}
+.pf-v5-c-button.pf-m-primary,#kc-login{background:var(--ld-green)!important;border-color:var(--ld-green)!important;border-radius:9px!important}
+.pf-v5-c-form-control,input{border-radius:9px!important}
+a{color:var(--ld-green)!important}

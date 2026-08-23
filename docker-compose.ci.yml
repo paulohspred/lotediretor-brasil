@@ -1,0 +1,11 @@
+services:
+  platform-db:
+    healthcheck:
+      start_period: 15s
+  control-db:
+    healthcheck:
+      start_period: 15s
+  opensearch:
+    environment:
+      DISABLE_INSTALL_DEMO_CONFIG: 'true'
+      DISABLE_SECURITY_PLUGIN: 'true'

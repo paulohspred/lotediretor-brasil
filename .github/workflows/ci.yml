@@ -18,7 +18,9 @@ jobs:
       - name: Run RC3 validation
         run: ./validate-v19-rc3.sh
       - name: Run v20 incremental validation
-        run: python tests/validate_v20_core_legal.py
+        run: |
+          python tests/validate_v20_core_legal.py
+          python tests/test_sao_paulo_v20_streaming_sync.py
       - name: Typecheck
         run: npm run typecheck
       - name: Build

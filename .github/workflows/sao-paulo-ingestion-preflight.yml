@@ -1,0 +1,38 @@
+name: sao-paulo-ingestion-preflight
+
+on:
+  pull_request:
+    branches: [develop]
+    paths:
+      - data/municipality-labs/sao-paulo-3550308.json
+      - workers/data-pipelines/sao_paulo_ingestion_preflight.py
+      - tests/test_sao_paulo_ingestion_preflight.py
+      - .github/workflows/sao-paulo-ingestion-preflight.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  preflight-official-wfs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install preflight dependencies
+        run: pip install requests psycopg[binary] boto3
+      - name: Run offline preflight regressions
+        run: python tests/test_sao_paulo_ingestion_preflight.py
+      - name: Measure official GeoSampa datasets without publishing
+        run: python workers/data-pipelines/sao_paulo_ingestion_preflight.py
+      - name: Upload capacity/schema evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sao-paulo-ingestion-preflight-${{ github.run_id }}
+          path: artifacts/sao-paulo-ingestion-preflight
+          if-no-files-found: warn
+          retention-days: 14

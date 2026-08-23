@@ -9,13 +9,20 @@ jobs:
         with: {node-version: 22}
       - uses: actions/setup-python@v5
         with: {python-version: '3.13'}
-      - run: pip install PyYAML reportlab requests
-      - run: ./validate-v19-rc3.sh
-      - run: npm install --workspaces --include-workspace-root --no-audit --no-fund
-      - run: npm run typecheck
-      - run: npm run build
-      - run: docker compose -f docker-compose.yml config >/dev/null
-      - run: docker compose -f docker-compose.yml -f docker-compose.production.yml config >/dev/null
+      - name: Install Python validation dependencies
+        run: pip install PyYAML reportlab requests shapely pyproj pypdf fastapi pydantic boto3 "psycopg[binary]"
+      - name: Install Node workspaces
+        run: npm install --workspaces --include-workspace-root --no-audit --no-fund
+      - name: Run RC3 validation
+        run: ./validate-v19-rc3.sh
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Build
+        run: npm run build
+      - name: Validate development compose
+        run: docker compose -f docker-compose.yml config >/dev/null
+      - name: Validate production compose
+        run: docker compose -f docker-compose.yml -f docker-compose.production.yml config >/dev/null
         env:
           PUBLIC_DOMAIN: app.test.invalid
           AUTH_DOMAIN: auth.test.invalid

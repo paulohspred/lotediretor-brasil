@@ -102,10 +102,10 @@ class ApiController{
     const idem=await withIdempotency(pool,session.organizationId,'property360.avm',key,async c=>{
       if(propertyId){const own=await c.query(`select id from property360.property where id=$1 and tenant_id=$2`,[propertyId,session.organizationId]);if(!own.rowCount)throw new HttpException('property_not_found',404);}
       const r=await c.query(`select id,source_kind,(price_cents::numeric/area_m2) cents_per_m2 from property360.comparable where municipality_ibge=$1 and property_type=$2 and area_m2>0 and price_cents>0 order by observed_at desc nulls last limit 30`,[municipality,propertyType]);
-      if(r.rowCount<3)return{status:'INSUFFICIENT_DATA',estimateCents:null,comparables:r.rowCount};
+      const comparableCount=r.rows.length;if(comparableCount<3)return{status:'INSUFFICIENT_DATA',estimateCents:null,comparables:comparableCount};
       const values=r.rows.map((x:any)=>Number(x.cents_per_m2)).sort((a:number,b:number)=>a-b);const median=values[Math.floor(values.length/2)];const estimateCents=Math.round(median*areaM2);const demo=r.rows.some((x:any)=>x.source_kind==='DEMO');
       const run=await c.query(`insert into property360.avm_run(tenant_id,property_id,municipality_ibge,area_m2,model_version,status,estimate_cents,confidence,comparable_ids,assumptions) values($1,$8,$2,$3,'median-price-m2-v16','CALCULATED',$4,$5,$6::uuid[],$7::jsonb) returning id,created_at`,[session.organizationId,municipality,areaM2,estimateCents,demo?0.25:0.55,r.rows.map((x:any)=>x.id),JSON.stringify({propertyType,demo}),propertyId]);
-      return{status:'CALCULATED',runId:run.rows[0].id,estimateCents,medianPricePerM2Cents:Math.round(median),comparables:r.rowCount,confidence:demo?0.25:0.55,dataClass:demo?'DEMO':'OBSERVED',warning:demo?'AVM demonstrativo. Os comparáveis DEMO não representam dados reais de mercado.':null};
+      return{status:'CALCULATED',runId:run.rows[0].id,estimateCents,medianPricePerM2Cents:Math.round(median),comparables:comparableCount,confidence:demo?0.25:0.55,dataClass:demo?'DEMO':'OBSERVED',warning:demo?'AVM demonstrativo. Os comparáveis DEMO não representam dados reais de mercado.':null};
     });
     return{...idem.value,idempotency:{replayed:idem.replayed,key:key||null}};
   }

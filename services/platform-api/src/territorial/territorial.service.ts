@@ -249,8 +249,8 @@ export class TerritorialService{
     const profile=await this.pool.query(`select municipality_ibge,status,source_profile,validation_summary,activated_at,updated_at from municipality.lab_profile where municipality_ibge=$1`,[municipalityIbge]);
     if(!profile.rowCount)throw new HttpException('municipality_lab_not_found',404);
     const cases=await this.pool.query(`select id,case_code,input_kind,input_payload,expected_official_reference,expected_parameters,status,reviewer,reviewed_at,notes,created_at from municipality.lab_validation_case where municipality_ibge=$1 order by case_code`,[municipalityIbge]);
-    const passed=cases.rows.filter((x:any)=>x.status==='PASS').length;const failed=cases.rows.filter((x:any)=>x.status==='FAIL').length;const pending=cases.rowCount-passed-failed;
-    return{profile:profile.rows[0],summary:{total:cases.rowCount,passed,failed,pending,minimum:10,homologationReady:cases.rowCount>=10&&failed===0&&pending===0},items:cases.rows};
+    const caseCount=cases.rows.length;const passed=cases.rows.filter((x:any)=>x.status==='PASS').length;const failed=cases.rows.filter((x:any)=>x.status==='FAIL').length;const pending=caseCount-passed-failed;
+    return{profile:profile.rows[0],summary:{total:caseCount,passed,failed,pending,minimum:10,homologationReady:caseCount>=10&&failed===0&&pending===0},items:cases.rows};
   }
 
   async upsertLabValidationCase(municipalityIbge:string,body:any){

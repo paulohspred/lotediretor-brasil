@@ -3,5 +3,5 @@ RUN apt-get update && apt-get install -y --no-install-recommends ocrmypdf tesser
 WORKDIR /app
 COPY workers/documents/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
-COPY workers/documents/main.py .
+COPY workers/documents/main.py workers/documents/rules.py workers/documents/chunking.py ./
 CMD ["python","main.py"]

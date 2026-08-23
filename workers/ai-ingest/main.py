@@ -28,6 +28,24 @@ def index_properties():
     }
 
 
+def wait_for_opensearch(timeout_seconds:float=180.0):
+    if not OPENSEARCH:return False
+    deadline=time.monotonic()+timeout_seconds
+    last_error='not_attempted'
+    while time.monotonic()<deadline:
+        try:
+            r=requests.get(f'{OPENSEARCH}/_cluster/health',params={'wait_for_status':'yellow','timeout':'5s'},auth=_auth(),timeout=10)
+            if r.ok:
+                payload=r.json() if r.content else {}
+                if payload.get('status') in {'yellow','green'}:
+                    return True
+            last_error=f'http_{r.status_code}:{r.text[:300]}'
+        except requests.RequestException as exc:
+            last_error=repr(exc)
+        time.sleep(2)
+    raise RuntimeError(f'opensearch_not_ready_after_{timeout_seconds}s:{last_error}')
+
+
 def ensure_index():
     if not OPENSEARCH:return False
     mapping={'settings':{'index':{'knn':True}},'mappings':{'dynamic':'strict','properties':index_properties()}}
@@ -86,6 +104,7 @@ def main():
     if not OPENSEARCH:
       print('ai-ingest disabled: OPENSEARCH_URL not configured',flush=True)
       while True:time.sleep(60)
+    wait_for_opensearch(float(os.getenv('OPENSEARCH_STARTUP_TIMEOUT_SECONDS','180')))
     ensure_index()
     print(f'ai-ingest index={INDEX} embeddings={bool(EMBED_ENDPOINT and EMBED_MODEL and EMBED_KEY)} dimension={EMBED_DIM}',flush=True)
     while True:

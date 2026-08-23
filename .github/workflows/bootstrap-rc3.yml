@@ -27,7 +27,7 @@ jobs:
           echo 'd82e19f6122bc6231da92a22c47ff7b07b287598762684fa2388218383368fab  LoteDiretor_SaaS_v19_RC3_FULL.zip' | sha256sum -c -
           unzip -t LoteDiretor_SaaS_v19_RC3_FULL.zip >/dev/null
 
-      - name: Extract RC3 into repository root
+      - name: Extract and verify RC3 package
         shell: bash
         run: |
           set -euo pipefail
@@ -38,22 +38,24 @@ jobs:
           test -d "$SRC"
           test -f "$SRC/VERSION"
           test "$(cat "$SRC/VERSION")" = '19.0.0-rc.3'
-          cp -a "$SRC"/. ./
+          (cd "$SRC" && sha256sum -c FILE_MANIFEST.sha256 >/dev/null)
+          echo 'RC3 package manifest verified.'
 
-      - name: Verify package manifest after extraction
+      - name: Copy RC3 into repository root
         shell: bash
         run: |
           set -euo pipefail
-          sha256sum -c FILE_MANIFEST.sha256 >/dev/null
-          echo 'RC3 manifest verified.'
+          SRC=/tmp/lotediretor-rc3/LoteDiretor_SaaS_v19_RC3
+          # Keep this one-time bootstrap workflow unchanged during the action.
+          # The normal CI workflow from the package is installed after the import.
+          rsync -a --exclude='.github/workflows/' "$SRC"/ ./
 
-      - name: Remove one-time bootstrap artifacts
+      - name: Remove upload and instruction artifacts
         shell: bash
         run: |
           set -euo pipefail
           rm -f LoteDiretor_SaaS_v19_RC3_FULL.zip
           rm -f IMPORT_RC3.md
-          rm -f .github/workflows/bootstrap-rc3.yml
 
       - name: Commit imported baseline
         shell: bash

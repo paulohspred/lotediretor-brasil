@@ -1,4 +1,4 @@
-import {Pool,PoolClient,QueryResult} from 'pg';
+import {Pool,PoolClient,QueryResult,QueryResultRow} from 'pg';
 
 export async function tenantTx<T>(pool:Pool,tenantId:string,fn:(client:PoolClient)=>Promise<T>):Promise<T>{
   if(!tenantId)throw new Error('tenant_id_required');
@@ -17,6 +17,6 @@ export async function tenantTx<T>(pool:Pool,tenantId:string,fn:(client:PoolClien
   }
 }
 
-export async function tenantQuery<T=any>(pool:Pool,tenantId:string,text:string,values:any[]=[]):Promise<QueryResult<T>>{
+export async function tenantQuery<T extends QueryResultRow=QueryResultRow>(pool:Pool,tenantId:string,text:string,values:any[]=[]):Promise<QueryResult<T>>{
   return tenantTx(pool,tenantId,client=>client.query<T>(text,values));
 }

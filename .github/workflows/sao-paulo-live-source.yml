@@ -1,0 +1,42 @@
+name: sao-paulo-live-source
+
+on:
+  pull_request:
+    branches: [develop]
+    paths:
+      - data/municipality-labs/sao-paulo-3550308.json
+      - workers/data-pipelines/connectors.py
+      - workers/data-pipelines/municipality_lab.py
+      - workers/data-pipelines/sao_paulo_live_inspection.py
+      - .github/workflows/sao-paulo-live-source.yml
+  workflow_dispatch:
+  schedule:
+    - cron: '17 9 * * *'
+
+permissions:
+  contents: read
+
+jobs:
+  inspect-official-wfs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: pip
+          cache-dependency-path: workers/data-pipelines/requirements.txt
+      - name: Install connector dependencies
+        run: pip install -r workers/data-pipelines/requirements.txt
+      - name: Inspect official parcel and zoning WFS
+        working-directory: workers/data-pipelines
+        run: python sao_paulo_live_inspection.py
+      - name: Upload source evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sao-paulo-live-source-${{ github.run_id }}
+          path: artifacts/sao-paulo-live-source
+          if-no-files-found: warn
+          retention-days: 14

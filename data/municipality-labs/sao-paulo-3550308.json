@@ -2,7 +2,7 @@
   "municipality_ibge": "3550308",
   "name": "São Paulo",
   "uf": "SP",
-  "status": "CORE_LAYERS_MAPPED_PENDING_RUNTIME_SYNC",
+  "status": "CORE_LAYERS_LIVE_SCHEMA_VERIFIED_PENDING_RUNTIME_SYNC",
   "sources": [
     {
       "code": "SP_GEOSAMPA_WFS",
@@ -13,7 +13,7 @@
         {
           "code": "PARCEL",
           "typename": "geoportal:lote_cidadao",
-          "status": "MAPPED_PENDING_INGESTION",
+          "status": "LIVE_SCHEMA_VERIFIED_PENDING_INGESTION",
           "metadata_uuid": "62c1113c-36a4-43d1-b763-81ec63b58116",
           "metadata_url": "https://metadados.geosampa.prefeitura.sp.gov.br/geonetwork/srv/api/records/62c1113c-36a4-43d1-b763-81ec63b58116",
           "native_crs": "EPSG:31983",
@@ -21,21 +21,49 @@
           "update_frequency": "DAILY",
           "source_revision": "2026-07-15",
           "target_layer_code": "SP_GEOSAMPA_PARCEL",
-          "domain": "CADASTRE"
+          "domain": "CADASTRE",
+          "live_schema_observed_at": "2026-08-23T21:12:27Z",
+          "canonical_mapping": {
+            "official_identifier_field": "cd_identificador",
+            "original_identifier_field": "cd_identificador_original_lote",
+            "sector_field": "cd_setor_fiscal",
+            "block_field": "cd_quadra_fiscal",
+            "lot_field": "cd_lote",
+            "check_digit_field": "cd_digito_sql",
+            "land_area_m2_field": "qt_area_terreno",
+            "built_area_m2_field": "qt_area_construida",
+            "status_field": "tx_situ_lote",
+            "street_name_field": "nm_logradouro_completo",
+            "street_number_field": "cd_numero_porta"
+          }
         },
         {
           "code": "ZONEAMENTO",
           "typename": "geoportal:perimetro_zona_lei_18177_24",
-          "status": "MAPPED_PENDING_INGESTION",
+          "status": "LIVE_SCHEMA_VERIFIED_PENDING_INGESTION",
           "metadata_uuid": "afc0cff0-933f-4bd1-8269-cf4ac3762571",
           "metadata_url": "https://metadados.geosampa.prefeitura.sp.gov.br/geonetwork/srv/api/records/afc0cff0-933f-4bd1-8269-cf4ac3762571",
           "law": "18.177/2024",
+          "law_url": "https://legislacao.prefeitura.sp.gov.br/lei-18177-de-25-de-julho-de-2024",
+          "law_publication_date": "2024-07-26",
+          "legal_valid_from": "2024-07-26T00:00:00-03:00",
+          "legal_efficacy_status": "PARTIALLY_SUSPENDED_WITHOUT_EXPRESS_REPEAL",
+          "legal_scope_note": "Lei 18.177/2024 entra em vigor na publicação. O catálogo oficial registra eficácia parcialmente suspensa, inclusive decisão judicial relativa a área/lotes específicos; regras afetadas exigem evidence/scope review e não podem ser tratadas como universalmente CONFIRMED.",
           "native_crs": "EPSG:31983",
           "requested_crs": "EPSG:4326",
           "update_frequency": "NOT_PLANNED",
           "source_revision": "2025-03-28",
           "target_layer_code": "SP_GEOSAMPA_ZONE_18177_2024",
-          "domain": "PLANNING"
+          "domain": "PLANNING",
+          "live_schema_observed_at": "2026-08-23T21:12:27Z",
+          "canonical_mapping": {
+            "official_identifier_field": "cd_identificador",
+            "zone_code_field": "cd_zoneamento_perimetro",
+            "zone_name_field": "tx_zoneamento_perimetro",
+            "law_number_field": "cd_numero_legislacao_zoneamento",
+            "law_year_field": "an_legislacao_zoneamento",
+            "source_updated_at_field": "dt_atualizacao"
+          }
         },
         {
           "code": "MUNICIPAL_GIS",
@@ -77,6 +105,8 @@
   "reviewed_at": "2026-08-23",
   "review_notes": [
     "GeoSampa parcel and current zoning layer names were mapped from official PMSP GeoNetwork/GeoSampa metadata.",
-    "Mapping does not equal ingestion/homologation; runtime sync + QA + human golden-lot validation remain mandatory."
+    "Live WFS sample inspection on 2026-08-23 verified the exact parcel and zoning property names used by canonical promotion.",
+    "Lei 18.177/2024 was published on 2024-07-26 and enters into force on publication; official municipal catalogue currently flags partial efficacy suspension, so scope-specific legal review remains mandatory.",
+    "Mapping and live schema verification do not equal ingestion/homologation; complete runtime sync + QA + canonical promotion + legal review + human golden-lot validation remain mandatory."
   ]
 }

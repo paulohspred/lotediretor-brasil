@@ -6,13 +6,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-        with: {node-version: 22}
+        with:
+          node-version: 22
+          cache: npm
       - uses: actions/setup-python@v5
         with: {python-version: '3.13'}
       - name: Install Python validation dependencies
         run: pip install PyYAML reportlab requests shapely pyproj pypdf fastapi pydantic boto3 "psycopg[binary]"
-      - name: Install Node workspaces
-        run: npm install --workspaces --include-workspace-root --no-audit --no-fund
+      - name: Install Node workspaces reproducibly
+        run: npm ci --workspaces --include-workspace-root --no-audit --no-fund
       - name: Run RC3 validation
         run: ./validate-v19-rc3.sh
       - name: Typecheck

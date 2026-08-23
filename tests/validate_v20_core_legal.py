@@ -1,10 +1,12 @@
 from pathlib import Path
+import subprocess
 
 root = Path(__file__).resolve().parents[1]
 migration = (root / 'db/platform/migrations/197_v20_core_legal_foundation.sql').read_text()
 base = (root / 'db/platform/migrations/150_v15_territorial_core.sql').read_text()
 uses = (root / 'db/platform/migrations/192_v19_beta_legal_conditions_uses.sql').read_text()
 evaluator = (root / 'services/platform-api/src/territorial/rule-evaluator.ts').read_text()
+runtime = (root / 'services/platform-api/src/territorial/rule-runtime.ts').read_text()
 
 # Existing canonical legal/territorial base must remain intact.
 for token in [
@@ -27,13 +29,20 @@ for token in [
 ]:
     assert token in migration, token
 
-# The evaluator already preserves tri-state applicability and composable conditions;
-# the new schema must build on it rather than introduce a second rule language.
-for token in ['MATCH', 'NO_MATCH', 'UNKNOWN', 'condition.all', 'condition.any', 'condition.not', 'between']:
+# Applicability stays tri-state and now covers explicit urban/licensing inputs.
+for token in ['MATCH', 'NO_MATCH', 'UNKNOWN', 'condition.all', 'condition.any', 'condition.not', 'between', 'eiv_required', 'zeis_code', 'road_widening_area_m2']:
     assert token in evaluator, token
+
+# Precedence/formulas are deterministic; conflicts and missing dependencies are surfaced.
+for token in ['evaluateFormula', 'evaluateRuleGraph', 'SAME_PRECEDENCE', 'required_rule_unknown', 'required_rule_not_applicable', 'division_by_zero']:
+    assert token in runtime, token
 
 # Guard the product rule: canonical bindings begin as candidates and must be reviewed.
 assert "status text NOT NULL DEFAULT 'CANDIDATE'" in migration
 assert "CHECK(status IN ('CANDIDATE','CONFIRMED','REJECTED','SUPERSEDED'))" in migration
+
+# Execute the actual TypeScript runtime (transpiled by the project TypeScript compiler)
+# rather than treating string assertions as sufficient behavioral evidence.
+subprocess.run(['node', str(root / 'tests/test_v20_rule_runtime.js')], cwd=root, check=True)
 
 print('v20 core/legal rule graph contracts OK')

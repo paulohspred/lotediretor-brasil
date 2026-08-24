@@ -140,6 +140,20 @@ async function providerAnswer(assistant:string,question:string,evidence:any[],tr
   };
 }
 
+function retrievalSummary(retrieval:any){
+  return{
+    mode:retrieval.mode,
+    lexicalCount:retrieval.lexicalCount||0,
+    vectorCount:retrieval.vectorCount||0,
+    contextCount:Array.isArray(retrieval.contextItems)?retrieval.contextItems.length:0,
+    sourceSnapshotIds:Array.isArray(retrieval.sourceSnapshotIds)?retrieval.sourceSnapshotIds:[],
+    hierarchyExpansion:retrieval.hierarchyExpansion||null,
+    rerankVersion:retrieval.rerankVersion||null,
+    cache:retrieval.cache||{eligible:false,hit:false},
+    errors:retrieval.errors||[]
+  };
+}
+
 app.get('/ai/health',async()=>({
   ok:true,
   service:'ai-gateway',
@@ -187,7 +201,7 @@ app.post('/ai/v1/chat',async(req:any,reply:any)=>{
   const rules=Array.isArray(body.context?.rules)?body.context.rules.slice(0,100):[];
   const contextEvidence=Array.isArray(body.context?.evidence)?body.context.evidence.slice(0,100):[];
 
-  let retrieval:any={mode:'not_requested',items:[]};
+  let retrieval:any={mode:'not_requested',items:[],contextItems:[],cache:{eligible:false,hit:false}};
   if(body.retrieval?.enabled&&body.tenantId){
     try{
       retrieval=await retrieveEvidence(String(body.tenantId),question,{
@@ -195,6 +209,10 @@ app.post('/ai/v1/chat',async(req:any,reply:any)=>{
         scopeId:body.retrieval.scopeId,
         municipalityIbge:body.retrieval.municipalityIbge,
         documentIds:body.retrieval.documentIds,
+        documentVersionIds:body.retrieval.documentVersionIds,
+        sourceSnapshotIds:body.retrieval.sourceSnapshotIds,
+        ruleSetHash:body.retrieval.ruleSetHash,
+        expandContext:body.retrieval.expandContext,
         topK:body.retrieval.topK,
         baseDate:body.retrieval.baseDate||body.baseDate,
         includePublic:body.retrieval.includePublic,
@@ -204,16 +222,28 @@ app.post('/ai/v1/chat',async(req:any,reply:any)=>{
       });
     }catch(error:any){
       app.log.warn({error,traceId},'retrieval failed');
-      retrieval={mode:'error',items:[],errors:[String(error?.message||error)]};
+      retrieval={mode:'error',items:[],contextItems:[],cache:{eligible:false,hit:false},errors:[String(error?.message||error)]};
     }
   }
 
-  const retrieved=(retrieval.items||[]).map((x:any)=>({
+  const retrieved=[...(retrieval.items||[]),...(retrieval.contextItems||[])].map((x:any)=>({
     id:x.id,
     title:x.title||`${x.domain||'Documento'} / ${x.documentId||x.id}`,
     locator:x.locator||`chunk:${x.id}`,
     text:x.text,
-    metadata:{...(x.metadata||{}),retrieval:{mode:retrieval.mode,rrfScore:x.rrfScore,sources:x.retrievalSources}}
+    metadata:{
+      ...(x.metadata||{}),
+      retrieval:{
+        mode:retrieval.mode,
+        rrfScore:x.rrfScore,
+        sources:x.retrievalSources,
+        contextOf:x.contextOf||null,
+        sourceSnapshotId:x.sourceSnapshotId||null,
+        documentVersionId:x.documentVersionId||null,
+        hierarchyExpansion:retrieval.hierarchyExpansion||null,
+        cacheHit:Boolean(retrieval.cache?.hit)
+      }
+    }
   }));
   const seen=new Set<string>();
   const evidence=[...retrieved,...contextEvidence].filter((x:any)=>{
@@ -222,6 +252,7 @@ app.post('/ai/v1/chat',async(req:any,reply:any)=>{
     seen.add(id);
     return true;
   }).slice(0,120);
+  const retrievalMeta=retrievalSummary(retrieval);
 
   if(modelProvidersConfigured()&&evidence.length){
     try{
@@ -246,7 +277,7 @@ app.post('/ai/v1/chat',async(req:any,reply:any)=>{
           assistant,
           risk_class:risk,
           ...provider,
-          retrieval:{mode:retrieval.mode,lexicalCount:retrieval.lexicalCount||0,vectorCount:retrieval.vectorCount||0,errors:retrieval.errors||[]}
+          retrieval:retrievalMeta
         };
         void trace({
           traceId,
@@ -277,7 +308,7 @@ app.post('/ai/v1/chat',async(req:any,reply:any)=>{
 
   const deterministic=deterministicAnswer(assistant,rules,evidence);
   if(deterministic){
-    const response={status:'GROUNDED',trace_id:traceId,risk_class:risk,...deterministic,retrieval:{mode:retrieval.mode,lexicalCount:retrieval.lexicalCount||0,vectorCount:retrieval.vectorCount||0,errors:retrieval.errors||[]}};
+    const response={status:'GROUNDED',trace_id:traceId,risk_class:risk,...deterministic,retrieval:retrievalMeta};
     void trace({traceId,tenantId:body.tenantId,assistant,status:'GROUNDED',question,evidence,rules,metadata:{mode:deterministic.mode,latencyMs:Date.now()-started,retrieval:response.retrieval}});
     return response;
   }
@@ -295,7 +326,7 @@ app.post('/ai/v1/chat',async(req:any,reply:any)=>{
     missing_information:['Evidência verificável suficiente para sustentar a conclusão.'],
     professional_review:risk==='HIGH'?'OBRIGATORIA':'RECOMENDADA',
     limitations:['insufficient_grounding'],
-    retrieval:{mode:retrieval.mode,lexicalCount:retrieval.lexicalCount||0,vectorCount:retrieval.vectorCount||0,errors:retrieval.errors||[]}
+    retrieval:retrievalMeta
   };
   void trace({traceId,tenantId:body.tenantId,assistant,status:'ABSTAINED',question,evidence,rules,metadata:{reason:'insufficient_grounding_or_provider_failure',latencyMs:Date.now()-started,retrieval:response.retrieval}});
   return response;

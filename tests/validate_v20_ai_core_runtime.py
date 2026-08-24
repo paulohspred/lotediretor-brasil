@@ -10,7 +10,8 @@ env=Path('.env.example').read_text()
 for needle in [
     "modelProvidersConfigured", "modelRouterStatus", "routeChat", "evaluateCases",
     "high_risk_requires_confirmed_deterministic_rule", "promptFingerprint",
-    "provider_invalid_evidence_id", "untrusted_content_flags"
+    "provider_invalid_evidence_id", "untrusted_content_flags",
+    "sourceSnapshotIds", "documentVersionIds", "hierarchyExpansion", "contextCount"
 ]:
     assert needle in main, needle
 
@@ -24,7 +25,10 @@ for needle in [
 for needle in [
     "retrieval_allowed", "tenant_id", "municipality_ibge", "knowledge_status",
     "recorded_at", "superseded_at", "valid_from", "valid_to",
-    "hybrid_rrf_legal_rerank", "lexical_legal_rerank"
+    "hybrid_rrf_legal_rerank", "lexical_legal_rerank",
+    "source_snapshot_id", "document_version_id", "chunk_index",
+    "pinnedRetrievalCacheKey", "AI_RETRIEVAL_CACHE_TTL_MS", "ruleSetHash",
+    "same_section_or_adjacent_chunks", "filterClauses(tenantId,scope)"
 ]:
     assert needle in retrieval, needle
 
@@ -37,12 +41,15 @@ for needle in ["recallAtK", "mrr", "ndcgAtK", "citationPrecision", "invalidCitat
 for needle in [
     "AI_FALLBACK_CHAT_ENDPOINT=", "AI_FALLBACK_API_KEY=", "AI_FALLBACK_MODEL=",
     "AI_CIRCUIT_FAILURE_THRESHOLD=", "AI_CIRCUIT_RESET_MS=",
-    "AI_INPUT_COST_PER_1M_USD=", "AI_FALLBACK_INPUT_COST_PER_1M_USD="
+    "AI_INPUT_COST_PER_1M_USD=", "AI_FALLBACK_INPUT_COST_PER_1M_USD=",
+    "AI_RETRIEVAL_CACHE_TTL_MS=30000", "AI_RETRIEVAL_CACHE_MAX_ENTRIES=200"
 ]:
     assert needle in env, needle
 
 # Costs/providers remain optional: the repository must not manufacture credentials or prices.
 assert 'AI_FALLBACK_API_KEY=change-me' not in env
 assert 'AI_INPUT_COST_PER_1M_USD=1' not in env
+# Cache safety invariant: latest/unpinned retrieval is explicitly excluded from caching.
+assert "if(!tenantId||!question.trim()||!snapshots.length||!scope.knowledgeAt)return null" in retrieval
 
 print('v20 AI Core runtime contract OK')

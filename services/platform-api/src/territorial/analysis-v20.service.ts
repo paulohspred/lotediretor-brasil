@@ -6,6 +6,7 @@ import {evaluateRuleGraph,type RuleDependency,type RuntimeRule} from './rule-run
 import {buildUrbanViability,type UrbanViabilityContext,type UrbanViabilityResult} from './urban-viability';
 import {resolveLegalTemporalGraph,type LegalTemporalResult} from './legal-temporal-runtime';
 import {deriveAnalysisRunStatus} from './analysis-decision-policy';
+import {deriveSpatialRuleContext} from './spatial-context';
 
 type RuleRow=RuntimeRule&{
   parameter?:string|null;
@@ -118,10 +119,11 @@ export class AnalysisV20Service{
     if(!resolved.selected)return{status:'INSUFFICIENT_DATA',baseDate:at,resolver:resolved,decision:null,findings:[],calculations:[],spatial:[],limitations:['Nenhuma parcela versionada foi resolvida para a entrada/data-base.']};
     if(resolved.requiresConfirmation)return{status:'REQUIRES_CONFIRMATION',baseDate:at,resolver:resolved,decision:null,findings:[],calculations:[],spatial:[],limitations:['Há múltiplos candidatos ou confiança insuficiente. Confirme a parcela antes de produzir conclusão técnica.']};
 
-    const parcel=resolved.selected;const zone=parcel.zones?.[0]||null;const area=Number(parcel.area_m2||0);
-    const context:UrbanViabilityContext={...cleanContext(rawContext),lot_area_m2:area,zone_code:zone?.code||null,municipality_ibge:parcel.municipality_ibge};
-    const timestamp=`${at}T12:00:00Z`;
-    const run=await c.query(`insert into analysis.run(tenant_id,status,base_date,input_snapshot) values($1,'RUNNING',$2,$3::jsonb) returning id,status,base_date,created_at`,[tenantId,at,JSON.stringify({contract:'analysis.v20',resolverInput:input,resolvedParcelId:parcel.id,municipalityIbge:parcel.municipality_ibge,zoneCode:zone?.code||null,technicalContext:context})]);
+    const parcel=resolved.selected;const zone=parcel.zones?.[0]||null;const area=Number(parcel.area_m2||0);const timestamp=`${at}T12:00:00Z`;
+    const spatial=await c.query(`with q as (select geom,st_area(geom::geography) area_m2 from geo.parcel where id=$1) select f.id feature_id,l.code layer_code,l.title layer_title,l.domain,f.official_identifier,f.source_snapshot_id,f.attributes,st_area(st_intersection(f.geom,q.geom)::geography) intersection_area_m2,case when q.area_m2>0 then st_area(st_intersection(f.geom,q.geom)::geography)/q.area_m2 else null end intersection_ratio from geo.feature f join geo.layer l on l.id=f.layer_id,q where st_intersects(f.geom,q.geom) and upper(l.domain)=any($2::text[]) and (l.municipality_ibge is null or l.municipality_ibge=$3) and (f.valid_from is null or f.valid_from <= $4::timestamptz) and (f.valid_to is null or f.valid_to > $4::timestamptz) and (f.superseded_at is null or f.superseded_at > $4::timestamptz) order by intersection_area_m2 desc limit 300`,[parcel.id,['ENVIRONMENT','RISK','INFRA','MOBILITY','HERITAGE','LICENSING'],parcel.municipality_ibge,timestamp]);
+    const spatialContext=deriveSpatialRuleContext(spatial.rows);
+    const context:UrbanViabilityContext={...cleanContext(rawContext),lot_area_m2:area,zone_code:zone?.code||null,municipality_ibge:parcel.municipality_ibge,...spatialContext.context};
+    const run=await c.query(`insert into analysis.run(tenant_id,status,base_date,input_snapshot) values($1,'RUNNING',$2,$3::jsonb) returning id,status,base_date,created_at`,[tenantId,at,JSON.stringify({contract:'analysis.v20',resolverInput:input,resolvedParcelId:parcel.id,municipalityIbge:parcel.municipality_ibge,zoneCode:zone?.code||null,technicalContext:context,spatialContextEvidence:spatialContext.evidence})]);
     const runId=run.rows[0].id;
 
     const rulesQuery=await c.query(`select r.id,r.zone_code,r.parameter,r.rule_code,r.rule_family,r.legal_effect,r.hard_constraint,r.priority,r.formula,r.input_schema,r.output_schema,r.status,r.value_numeric,r.value_text,r.unit,r.condition,r.valid_from,r.valid_to,r.source_document_version_id,r.source_article_id,r.source_locator,dv.source_snapshot_id,dv.document_id,dv.valid_from document_valid_from,dv.valid_to document_valid_to,dv.status document_status,dv.version_label,dv.effective_date,dv.sha256,d.title document_title from legal.rule r left join legal.document_version dv on dv.id=r.source_document_version_id left join legal.document d on d.id=dv.document_id where r.municipality_ibge=$1 and (r.zone_code=$2::text or r.zone_code is null) and r.status in ('CONFIRMED','CANDIDATE') order by (r.zone_code=$2::text) desc,r.priority asc,r.parameter,r.created_at desc`,[parcel.municipality_ibge,zone?.code||null]);
@@ -153,9 +155,8 @@ export class AnalysisV20Service{
     let decision=buildUrbanViability(runtime,context);
     decision=mergeTemporalDecision(decision,temporalStates);
 
-    const spatial=await c.query(`with q as (select geom,st_area(geom::geography) area_m2 from geo.parcel where id=$1) select f.id feature_id,l.code layer_code,l.title layer_title,l.domain,f.official_identifier,f.source_snapshot_id,f.attributes,st_area(st_intersection(f.geom,q.geom)::geography) intersection_area_m2,case when q.area_m2>0 then st_area(st_intersection(f.geom,q.geom)::geography)/q.area_m2 else null end intersection_ratio from geo.feature f join geo.layer l on l.id=f.layer_id,q where st_intersects(f.geom,q.geom) and upper(l.domain)=any($2::text[]) and (l.municipality_ibge is null or l.municipality_ibge=$3) and (f.valid_from is null or f.valid_from <= $4::timestamptz) and (f.valid_to is null or f.valid_to > $4::timestamptz) and (f.superseded_at is null or f.superseded_at > $4::timestamptz) order by intersection_area_m2 desc limit 300`,[parcel.id,['ENVIRONMENT','RISK','INFRA','MOBILITY','HERITAGE','LICENSING'],parcel.municipality_ibge,timestamp]);
-
     const findings:any[]=[];
+    for(const evidence of spatialContext.evidence){const value={field:evidence.field,value:evidence.value,featureIds:evidence.featureIds,layerCodes:evidence.layerCodes,reason:evidence.reason};await c.query(`insert into analysis.finding(run_id,category,status,code,title,value) values($1,'SPATIAL_CONTEXT','CONFIRMED',$2,$3,$4::jsonb)`,[runId,`SPATIAL_CONTEXT_${String(evidence.field).toUpperCase()}`,`Contexto espacial confirmado: ${String(evidence.field)}`,JSON.stringify(value)]);findings.push({category:'SPATIAL_CONTEXT',status:'CONFIRMED',code:`SPATIAL_CONTEXT_${String(evidence.field).toUpperCase()}`,value});}
     for(const rule of ruleRows){
       const temporalState=stateByRule.get(rule.id);const status=rulePersistenceStatus(rule,runtime,temporalState);const parameter=String(rule.parameter||rule.rule_code||rule.rule_family||'RULE');
       if(rule.synthetic_kind!=='ZONE_USE_PERMISSION')await c.query(`insert into planning.analysis_parameter(run_id,parameter,value_numeric,value_text,unit,status,rule_id,source_document_version_id,source_locator) values($1,$2,$3,$4,$5,$6,$7,$8,$9)`,[runId,parameter,rule.value_numeric??null,rule.value_text??null,rule.unit??null,status,rule.id,rule.source_document_version_id??null,rule.source_locator??null]);
@@ -189,9 +190,9 @@ export class AnalysisV20Service{
       temporalDecisionUnknown?`${temporalDecisionUnknown} elemento(s) temporal(is) confirmado(s) não puderam ter eficácia determinada.`:null,
       runtime.unknown.length?`${runtime.unknown.length} regra(s) confirmada(s) dependem de contexto técnico ainda não informado.`:null,
       runtime.conflicts.length?`${runtime.conflicts.length} conflito(s) de regra confirmada permanecem sem resolução.`:null,
-      !spatial.rows.length?'Nenhuma camada territorial publicada dos domínios críticos intersectou a parcela.':null
+      !spatial.rows.length?'Nenhuma camada territorial publicada dos domínios críticos intersectou a parcela. Ausência de interseção não é tratada como cobertura negativa quando a fonte não está publicada.':null
     ].filter(Boolean);
 
-    return{status,run:{...run.rows[0],status},baseDate:at,resolver:resolved,zone,technicalContext:context,decision,legalTemporal:temporal,ruleRuntime:{selected:runtime.selected,calculated:runtime.calculated,unknown:runtime.unknown,blocked:runtime.blocked,conflicts:runtime.conflicts,trace:runtime.trace},findings,calculations:[...simple,...decision.calculations],spatial:spatial.rows,snapshotIds:[...snapshotIds],limitations};
+    return{status,run:{...run.rows[0],status},baseDate:at,resolver:resolved,zone,technicalContext:context,spatialContextEvidence:spatialContext.evidence,decision,legalTemporal:temporal,ruleRuntime:{selected:runtime.selected,calculated:runtime.calculated,unknown:runtime.unknown,blocked:runtime.blocked,conflicts:runtime.conflicts,trace:runtime.trace},findings,calculations:[...simple,...decision.calculations],spatial:spatial.rows,snapshotIds:[...snapshotIds],limitations};
   }
 }

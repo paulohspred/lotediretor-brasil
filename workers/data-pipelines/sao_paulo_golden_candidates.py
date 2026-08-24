@@ -150,7 +150,8 @@ def select(profile: dict[str, Any], count: int, base_date: str, timeout: int = 3
         ids.add(oid)
         candidates.append(candidate)
 
-    profile_bytes = PROFILE.read_bytes() if PROFILE.exists() else json.dumps(profile, sort_keys=True).encode()
+    # Hash the semantic profile content, not local filesystem metadata. This remains reproducible for alternate profile paths.
+    profile_bytes = json.dumps(profile, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
     return {
         "municipality_ibge": profile["municipality_ibge"],
         "generated_at": datetime.now(timezone.utc).isoformat(),
@@ -195,8 +196,6 @@ def main() -> int:
         raise SystemExit("--count must be between 10 and 20 for the São Paulo golden-lot plan")
     profile_path = Path(args.profile)
     profile = json.loads(profile_path.read_text(encoding="utf-8"))
-    global PROFILE
-    PROFILE = profile_path
     result = select(profile, args.count, args.base_date, args.timeout)
     output = Path(args.output)
     output.parent.mkdir(parents=True, exist_ok=True)

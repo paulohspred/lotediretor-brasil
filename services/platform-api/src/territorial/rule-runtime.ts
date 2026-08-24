@@ -20,6 +20,7 @@ export type RuntimeRule={
   condition?:unknown;
   formula?:unknown;
   value_numeric?:number|string|null;
+  value_text?:string|null;
   unit?:string|null;
   source_document_version_id?:string|null;
   source_article_id?:string|null;
@@ -108,7 +109,7 @@ export function evaluateFormula(formula:any,ctx:RuleContext):FormulaResult{
 }
 
 function groupKey(rule:RuntimeRule){return String(rule.rule_code||rule.rule_family||rule.id);}
-function signature(rule:RuntimeRule){return JSON.stringify({legal_effect:rule.legal_effect??null,value_numeric:rule.value_numeric??null,unit:rule.unit??null,formula:rule.formula??null});}
+function signature(rule:RuntimeRule){return JSON.stringify({legal_effect:rule.legal_effect??null,value_numeric:rule.value_numeric??null,value_text:rule.value_text??null,unit:rule.unit??null,formula:rule.formula??null});}
 
 export function evaluateRuleGraph(rules:RuntimeRule[],dependencies:RuleDependency[],ctx:RuleContext,asOf:string|Date):RuleRuntimeResult{
   const result:RuleRuntimeResult={selected:[],calculated:[],unknown:[],blocked:[],conflicts:[],trace:[]};

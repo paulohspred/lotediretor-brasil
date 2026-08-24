@@ -57,9 +57,23 @@ function ruleNumber(rule:UrbanRule|undefined,calculated:Map<string,FormulaResult
   return ['%','PERCENT','PCT','POR CENTO'].includes(unit)?raw/100:raw;
 }
 
-function addMaxCheck(checks:UrbanRuleCheck[],code:string,rule:UrbanRule|undefined,actual:unknown,calculated:Map<string,FormulaResult>,unit:string,reason:string){
+function ratioAreaLimit(rule:UrbanRule|undefined,calculated:Map<string,FormulaResult>,lotArea:unknown){
+  if(!rule)return null;
+  const formula=calculated.get(rule.id);
+  if(formula?.status==='CALCULATED')return formula.value;
+  const ratio=ruleNumber(rule,calculated);
+  const area=finite(lotArea);
+  return ratio===null||area===null?null:ratio*area;
+}
+
+function shareRatio(value:unknown){
+  const n=finite(value);
+  return n===null?null:(n>1?n/100:n);
+}
+
+function addMaxCheck(checks:UrbanRuleCheck[],code:string,rule:UrbanRule|undefined,actual:unknown,calculated:Map<string,FormulaResult>,unit:string,reason:string,requiredOverride?:number|null){
   if(!rule)return;
-  const required=ruleNumber(rule,calculated);
+  const required=requiredOverride===undefined?ruleNumber(rule,calculated):requiredOverride;
   const actualNumber=finite(actual);
   const formulaResult=calculated.get(rule.id);
   if(required===null||actualNumber===null){
@@ -69,9 +83,9 @@ function addMaxCheck(checks:UrbanRuleCheck[],code:string,rule:UrbanRule|undefine
   checks.push({code,status:actualNumber<=required?'PASS':'FAIL',ruleId:rule.id,actual:actualNumber,required,unit,reason,formulaResult});
 }
 
-function addMinCheck(checks:UrbanRuleCheck[],code:string,rule:UrbanRule|undefined,actual:unknown,calculated:Map<string,FormulaResult>,unit:string,reason:string){
+function addMinCheck(checks:UrbanRuleCheck[],code:string,rule:UrbanRule|undefined,actual:unknown,calculated:Map<string,FormulaResult>,unit:string,reason:string,requiredOverride?:number|null){
   if(!rule)return;
-  const required=ruleNumber(rule,calculated);
+  const required=requiredOverride===undefined?ruleNumber(rule,calculated):requiredOverride;
   const actualNumber=finite(actual);
   const formulaResult=calculated.get(rule.id);
   if(required===null||actualNumber===null){
@@ -112,9 +126,11 @@ export function buildUrbanViability(runtime:RuleRuntimeResult,context:UrbanViabi
   const reasons:string[]=[];
 
   const permissionRule=selected.get('USE_PERMISSION')||selected.get('USE')||selected.get('LAND_USE_PERMISSION');
-  if(context.proposed_use){
+  if(!context.proposed_use){
+    checks.push({code:'USE_PERMISSION',status:'UNKNOWN',ruleId:permissionRule?.id||null,actual:null,required:null,unit:null,reason:'proposed_use_missing'});
+  }else{
     const permission=usePermission(permissionRule);
-    if(!permissionRule){checks.push({code:'USE_PERMISSION',status:'UNKNOWN',ruleId:null,actual:context.proposed_use,required:null,unit:null,reason:'missing_confirmed_use_permission'});}
+    if(!permissionRule)checks.push({code:'USE_PERMISSION',status:'UNKNOWN',ruleId:null,actual:context.proposed_use,required:null,unit:null,reason:'missing_confirmed_use_permission'});
     else if(permission==='PROHIBITED')checks.push({code:'USE_PERMISSION',status:'FAIL',ruleId:permissionRule.id,actual:context.proposed_use,required:'PROHIBITED',unit:null,reason:'confirmed_use_prohibition'});
     else if(permission==='CONDITIONED')checks.push({code:'USE_PERMISSION',status:'CONDITION',ruleId:permissionRule.id,actual:context.proposed_use,required:'CONDITIONED',unit:null,reason:'confirmed_use_condition'});
     else if(permission==='PERMITTED')checks.push({code:'USE_PERMISSION',status:'PASS',ruleId:permissionRule.id,actual:context.proposed_use,required:'PERMITTED',unit:null,reason:'confirmed_use_permission'});
@@ -130,9 +146,9 @@ export function buildUrbanViability(runtime:RuleRuntimeResult,context:UrbanViabi
   addMinCheck(checks,'PARKING_MIN',selected.get('PARKING_MIN')||selected.get('PARKING_MIN_SPACES'),context.parking_spaces,calculated,'spaces','minimum_parking');
 
   const caMax=selected.get('CA_MAX');
-  if(caMax&&context.computable_area_m2!==undefined)addMaxCheck(checks,'CA_MAX',caMax,context.computable_area_m2,calculated,'m²','maximum_computable_area');
+  if(caMax&&context.computable_area_m2!==undefined)addMaxCheck(checks,'CA_MAX',caMax,context.computable_area_m2,calculated,'m²','maximum_computable_area',ratioAreaLimit(caMax,calculated,context.lot_area_m2));
   const toMax=selected.get('TO_MAX');
-  if(toMax&&context.proposed_footprint_m2!==undefined)addMaxCheck(checks,'TO_MAX',toMax,context.proposed_footprint_m2,calculated,'m²','maximum_footprint');
+  if(toMax&&context.proposed_footprint_m2!==undefined)addMaxCheck(checks,'TO_MAX',toMax,context.proposed_footprint_m2,calculated,'m²','maximum_footprint',ratioAreaLimit(toMax,calculated,context.lot_area_m2));
 
   const density=selected.get('DENSITY_MAX_U_HA');
   if(density&&context.proposed_units!==undefined){
@@ -142,7 +158,7 @@ export function buildUrbanViability(runtime:RuleRuntimeResult,context:UrbanViabi
   }
 
   const affordable=selected.get('ZEIS_HIS_HMP_SHARE_MIN')||selected.get('AFFORDABLE_HOUSING_SHARE_MIN');
-  if(affordable)addMinCheck(checks,'AFFORDABLE_HOUSING_SHARE_MIN',affordable,context.affordable_housing_share_pct,calculated,'ratio','minimum_affordable_housing_share');
+  if(affordable)addMinCheck(checks,'AFFORDABLE_HOUSING_SHARE_MIN',affordable,shareRatio(context.affordable_housing_share_pct),calculated,'ratio','minimum_affordable_housing_share');
 
   for(const code of ['EIV_TRIGGER','PGT_TRIGGER','OUTORGA_REQUIRED','CEPAC_REQUIRED','TDC_REQUIRED']){
     const rule=selected.get(code);if(!rule)continue;
@@ -151,7 +167,8 @@ export function buildUrbanViability(runtime:RuleRuntimeResult,context:UrbanViabi
   }
   for(const [code,rule] of selected){
     if(!['OUTORGA_COST','OUTORGA_ESTIMATE','CEPAC_QUANTITY','CEPAC_COST','TDC_CAPACITY','TDC_VALUE'].includes(code))continue;
-    const formula=calculated.get(rule.id);const value=formula?.status==='CALCULATED'?formula.value:rule.value_numeric??rule.value_text??null;
+    const formula=calculated.get(rule.id);
+    const value=formula?.status==='CALCULATED'?formula.value:rule.value_numeric??rule.value_text??null;
     obligations.push({code,ruleId:rule.id,value,unit:rule.unit||null});
     if(formula&&formula.status!=='CALCULATED')checks.push({code,status:'UNKNOWN',ruleId:rule.id,actual:null,required:null,unit:rule.unit||null,reason:'instrument_formula_not_calculated',formulaResult:formula});
   }

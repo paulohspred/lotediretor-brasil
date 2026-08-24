@@ -90,14 +90,24 @@ function usePermission(rule:UrbanRule|undefined):'PERMITTED'|'CONDITIONED'|'PROH
   if(!rule)return null;
   const raw=normalized(rule.value_text||rule.legal_effect);
   if(['PERMITTED','PERMITIDO','ALLOW','ALLOWED','PERMISSIVE'].includes(raw))return 'PERMITTED';
-  if(['CONDITIONED','CONDICIONADO','CONDITIONAL'].includes(raw))return 'CONDITIONED';
+  if(['CONDITIONED','CONDICIONADO','CONDITIONAL','SPECIAL','TOLERATED','NONCONFORMING'].includes(raw))return 'CONDITIONED';
   if(['PROHIBITED','PROIBIDO','DENY','DENIED','RESTRICTIVE'].includes(raw))return 'PROHIBITED';
   return 'UNKNOWN';
 }
 
+function addPresenceRestriction(checks:UrbanRuleCheck[],code:string,rule:UrbanRule|undefined,present:unknown,reason:string){
+  if(!rule)return;
+  if(typeof present!=='boolean'){checks.push({code,status:'UNKNOWN',ruleId:rule.id,actual:null,required:null,unit:null,reason:`${reason}:spatial_evidence_unknown`});return;}
+  if(!present){checks.push({code,status:'PASS',ruleId:rule.id,actual:false,required:false,unit:null,reason:`${reason}:no_overlap`});return;}
+  const effect=usePermission(rule);
+  if(effect==='PROHIBITED'){checks.push({code,status:'FAIL',ruleId:rule.id,actual:true,required:false,unit:null,reason:`${reason}:confirmed_prohibition`});return;}
+  if(effect==='CONDITIONED'||normalized(rule.legal_effect)==='PROCEDURAL'){checks.push({code,status:'CONDITION',ruleId:rule.id,actual:true,required:'REVIEW_OR_CONDITION',unit:null,reason:`${reason}:confirmed_condition`});return;}
+  checks.push({code,status:'UNKNOWN',ruleId:rule.id,actual:true,required:rule.value_text??null,unit:null,reason:`${reason}:overlap_effect_not_explicit`});
+}
+
 const decisionRelevant=(rule:RuntimeRule)=>{
   const code=normalized(rule.rule_code||rule.rule_family);
-  return Boolean(rule.hard_constraint)||code.startsWith('USE_')||code.includes('HEIGHT')||code.includes('SETBACK')||code.includes('RECUO')||code.includes('PARKING')||code.includes('VAGAS')||code.includes('DENSITY')||code.includes('CA_')||code.includes('TO_')||code.includes('TP_')||code.includes('LOT_')||code.includes('FRONTAGE')||code.includes('ZEIS')||code.includes('HIS')||code.includes('HMP');
+  return Boolean(rule.hard_constraint)||code.startsWith('USE_')||code.includes('HEIGHT')||code.includes('SETBACK')||code.includes('RECUO')||code.includes('PARKING')||code.includes('VAGAS')||code.includes('DENSITY')||code.includes('CA_')||code.includes('TO_')||code.includes('TP_')||code.includes('LOT_')||code.includes('FRONTAGE')||code.includes('ZEIS')||code.includes('HIS')||code.includes('HMP')||code.includes('HERITAGE')||code.includes('PATRIMON')||code.includes('AERODROM')||code.includes('AIRSPACE')||code.includes('EASEMENT')||code.includes('SERVIDAO')||code.includes('WIDENING')||code.includes('MELHORAMENTO');
 };
 
 export function buildUrbanViability(runtime:RuleRuntimeResult,context:UrbanViabilityContext):UrbanViabilityResult{
@@ -126,6 +136,7 @@ export function buildUrbanViability(runtime:RuleRuntimeResult,context:UrbanViabi
   addMinCheck(checks,'SIDE_SETBACK_MIN_M',selected.get('SIDE_SETBACK_MIN_M')||selected.get('RECUO_LATERAL_MIN_M'),context.side_setback_m,calculated,'m','minimum_side_setback');
   addMinCheck(checks,'REAR_SETBACK_MIN_M',selected.get('REAR_SETBACK_MIN_M')||selected.get('RECUO_FUNDOS_MIN_M'),context.rear_setback_m,calculated,'m','minimum_rear_setback');
   addMinCheck(checks,'PARKING_MIN',selected.get('PARKING_MIN')||selected.get('PARKING_MIN_SPACES'),context.parking_spaces,calculated,'spaces','minimum_parking');
+  addMinCheck(checks,'BICYCLE_PARKING_MIN',selected.get('BICYCLE_PARKING_MIN')||selected.get('BIKE_PARKING_MIN'),context.bicycle_spaces,calculated,'spaces','minimum_bicycle_parking');
 
   const caMax=selected.get('CA_MAX');
   if(caMax)addMaxCheck(checks,'CA_MAX',caMax,context.computable_area_m2,calculated,'m²','maximum_computable_area',ratioAreaLimit(caMax,calculated,context.lot_area_m2));
@@ -137,6 +148,20 @@ export function buildUrbanViability(runtime:RuleRuntimeResult,context:UrbanViabi
 
   const affordable=selected.get('ZEIS_HIS_HMP_SHARE_MIN')||selected.get('AFFORDABLE_HOUSING_SHARE_MIN');
   if(affordable)addMinCheck(checks,'AFFORDABLE_HOUSING_SHARE_MIN',affordable,shareRatio(context.affordable_housing_share_pct),calculated,'ratio','minimum_affordable_housing_share');
+
+  const aerodrome=selected.get('AERODROME_HEIGHT_MAX_M')||selected.get('AIRSPACE_HEIGHT_MAX_M')||selected.get('DECEA_HEIGHT_MAX_M');
+  if(aerodrome){const legalLimit=ruleNumber(aerodrome,calculated);const spatialLimit=finite(context.aerodrome_limit_m);const required=legalLimit!==null&&spatialLimit!==null?Math.min(legalLimit,spatialLimit):(spatialLimit??legalLimit);addMaxCheck(checks,'AERODROME_HEIGHT_MAX_M',aerodrome,context.height_m,calculated,'m','aerodrome_or_airspace_height_limit',required);}
+
+  const heritage=selected.get('HERITAGE_RESTRICTION')||selected.get('HERITAGE_OVERLAP_RESTRICTION')||selected.get('PATRIMONIO_RESTRICTION');
+  addPresenceRestriction(checks,'HERITAGE_RESTRICTION',heritage,context.heritage_overlap,'heritage_overlap');
+
+  const easement=selected.get('EASEMENT_NO_BUILD')||selected.get('SERVIDAO_NO_BUILD');
+  if(easement)addMaxCheck(checks,'EASEMENT_NO_BUILD',easement,context.easement_overlap_m2,calculated,'m²','easement_overlap_must_be_zero',0);
+  const easementMax=selected.get('EASEMENT_OVERLAP_MAX_M2')||selected.get('SERVIDAO_OVERLAP_MAX_M2');
+  if(easementMax)addMaxCheck(checks,'EASEMENT_OVERLAP_MAX_M2',easementMax,context.easement_overlap_m2,calculated,'m²','maximum_easement_overlap');
+
+  const widening=selected.get('ROAD_WIDENING_RESERVE')||selected.get('ROAD_WIDENING_RESTRICTION')||selected.get('MELHORAMENTO_VIARIO_RESTRICTION');
+  if(widening){const area=finite(context.road_widening_area_m2);if(area===null)checks.push({code:'ROAD_WIDENING_RESTRICTION',status:'UNKNOWN',ruleId:widening.id,actual:null,required:null,unit:'m²',reason:'road_widening_spatial_evidence_unknown'});else if(area>0){checks.push({code:'ROAD_WIDENING_RESTRICTION',status:'CONDITION',ruleId:widening.id,actual:area,required:'RESERVE_OR_REVIEW',unit:'m²',reason:'confirmed_road_widening_affects_parcel'});obligations.push({code:'ROAD_WIDENING_RESERVE',ruleId:widening.id,value:area,unit:'m²'});}else checks.push({code:'ROAD_WIDENING_RESTRICTION',status:'PASS',ruleId:widening.id,actual:0,required:0,unit:'m²',reason:'no_road_widening_overlap'});}
 
   for(const code of ['EIV_TRIGGER','PGT_TRIGGER','OUTORGA_REQUIRED','CEPAC_REQUIRED','TDC_REQUIRED']){const rule=selected.get(code);if(!rule)continue;obligations.push({code,ruleId:rule.id,value:rule.value_text??rule.value_numeric??true,unit:rule.unit||null});checks.push({code,status:'CONDITION',ruleId:rule.id,actual:true,required:true,unit:rule.unit||null,reason:'confirmed_procedural_or_financial_obligation'});}
   for(const [code,rule] of selected){if(!['OUTORGA_COST','OUTORGA_ESTIMATE','CEPAC_QUANTITY','CEPAC_COST','TDC_CAPACITY','TDC_VALUE'].includes(code))continue;const formula=calculated.get(rule.id);const value=formula?.status==='CALCULATED'?formula.value:rule.value_numeric??rule.value_text??null;obligations.push({code,ruleId:rule.id,value,unit:rule.unit||null});if(formula&&formula.status!=='CALCULATED')checks.push({code,status:'UNKNOWN',ruleId:rule.id,actual:null,required:null,unit:rule.unit||null,reason:'instrument_formula_not_calculated',formulaResult:formula});}

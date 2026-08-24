@@ -8,6 +8,7 @@ uses = (root / 'db/platform/migrations/192_v19_beta_legal_conditions_uses.sql').
 evaluator = (root / 'services/platform-api/src/territorial/rule-evaluator.ts').read_text()
 runtime = (root / 'services/platform-api/src/territorial/rule-runtime.ts').read_text()
 viability = (root / 'services/platform-api/src/territorial/urban-viability.ts').read_text()
+temporal = (root / 'services/platform-api/src/territorial/legal-temporal-runtime.ts').read_text()
 
 # Existing canonical legal/territorial base must remain intact.
 for token in [
@@ -42,6 +43,10 @@ for token in ['evaluateFormula', 'evaluateRuleGraph', 'SAME_PRECEDENCE', 'requir
 for token in ['buildUrbanViability', 'CONFLICTING', 'PROHIBITED', 'UNKNOWN', 'USE_PERMISSION', 'EIV_TRIGGER', 'OUTORGA_COST', 'AFFORDABLE_HOUSING_SHARE_MIN']:
     assert token in viability, token
 
+# Temporal legal effects remain explicit, article-aware and fail closed when dates conflict/are missing.
+for token in ['resolveLegalTemporalGraph', 'SUSPENDE_EFICACIA', 'RESTAURA_EFICACIA', 'REVOGA', 'SUBSTITUI', 'opposed_confirmed_effects_same_instant', 'unknown_effective_time']:
+    assert token in temporal, token
+
 # Guard the product rule: canonical bindings begin as candidates and must be reviewed.
 assert "status text NOT NULL DEFAULT 'CANDIDATE'" in migration
 assert "CHECK(status IN ('CANDIDATE','CONFIRMED','REJECTED','SUPERSEDED'))" in migration
@@ -50,5 +55,6 @@ assert "CHECK(status IN ('CANDIDATE','CONFIRMED','REJECTED','SUPERSEDED'))" in m
 # rather than treating string assertions as sufficient behavioral evidence.
 subprocess.run(['node', str(root / 'tests/test_v20_rule_runtime.js')], cwd=root, check=True)
 subprocess.run(['node', str(root / 'tests/test_v20_urban_viability.js')], cwd=root, check=True)
+subprocess.run(['node', str(root / 'tests/test_v20_legal_temporal_runtime.js')], cwd=root, check=True)
 
-print('v20 core/legal rule graph and urban viability contracts OK')
+print('v20 core/legal rule graph, temporal effects and urban viability contracts OK')

@@ -13,6 +13,12 @@
     "zone_valid_from": "2024-07-26T00:00:00-03:00",
     "legal_scope_review_required": true
   },
+  "homologation_policy": {
+    "machine_gate_can_homologate": false,
+    "professional_review_required": true,
+    "all_golden_cases_must_pass": true,
+    "production_ready_requires_separate_release_approval": true
+  },
   "required_case_fields": [
     "case_code",
     "input_kind",
@@ -23,6 +29,28 @@
     "expected_parameters",
     "human_reviewer",
     "human_reviewed_at"
+  ],
+  "required_case_evidence": [
+    "parcel_snapshot_sha256",
+    "zone_snapshot_sha256",
+    "legal_snapshot_sha256",
+    "analysis_run_id",
+    "evidence_report_ref"
+  ],
+  "required_review_dimensions": [
+    "parcel_geometry",
+    "parcel_area",
+    "zone",
+    "ca",
+    "to",
+    "tp",
+    "height",
+    "setbacks",
+    "uses",
+    "restrictions",
+    "legal_temporality",
+    "analysis_reproducibility",
+    "ai_grounding"
   ],
   "coverage_targets": [
     "zonas distintas",

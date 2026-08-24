@@ -36,6 +36,16 @@ result=run(baseRules,{proposed_use:'RESIDENTIAL',lot_area_m2:1000,computable_are
 assert.equal(result.status,'PROHIBITED');
 assert(result.checks.some(x=>x.code==='CA_MAX'&&x.status==='FAIL'));
 
+const directRatios=[
+  {id:'use-ratio',status:'CONFIRMED',rule_code:'USE_PERMISSION',value_text:'PERMITTED',hard_constraint:true,priority:10,condition:{field:'proposed_use',op:'eq',value:'RESIDENTIAL'}},
+  {id:'ca-ratio',status:'CONFIRMED',rule_code:'CA_MAX',hard_constraint:true,priority:10,value_numeric:4,unit:'ratio'},
+  {id:'to-ratio',status:'CONFIRMED',rule_code:'TO_MAX',hard_constraint:true,priority:10,value_numeric:0.7,unit:'ratio'},
+];
+result=run(directRatios,{proposed_use:'RESIDENTIAL',lot_area_m2:1000,computable_area_m2:3900,proposed_footprint_m2:690});
+assert.equal(result.status,'PERMITTED');
+assert.equal(result.checks.find(x=>x.code==='CA_MAX').required,4000);
+assert.equal(result.checks.find(x=>x.code==='TO_MAX').required,700);
+
 const prohibited=[{id:'use-no',status:'CONFIRMED',rule_code:'USE_PERMISSION',rule_family:'USE',value_text:'PROHIBITED',hard_constraint:true,priority:10,condition:{field:'proposed_use',op:'eq',value:'INDUSTRIAL'}}];
 result=run(prohibited,{proposed_use:'INDUSTRIAL',lot_area_m2:1000});
 assert.equal(result.status,'PROHIBITED');
@@ -60,6 +70,10 @@ result=run(unknownRules,{proposed_use:'RESIDENTIAL',lot_area_m2:1000});
 assert.equal(result.status,'UNKNOWN');
 assert(result.unknownRuleIds.includes('setback'));
 
+result=run([],{lot_area_m2:1000});
+assert.equal(result.status,'UNKNOWN');
+assert(result.checks.some(x=>x.code==='USE_PERMISSION'&&x.reason==='proposed_use_missing'));
+
 const conflictRules=[
   {id:'use-a',status:'CONFIRMED',rule_code:'USE_PERMISSION',value_text:'PERMITTED',hard_constraint:true,priority:10,condition:{field:'proposed_use',op:'eq',value:'RESIDENTIAL'}},
   {id:'use-b',status:'CONFIRMED',rule_code:'USE_PERMISSION',value_text:'PROHIBITED',hard_constraint:true,priority:10,condition:{field:'proposed_use',op:'eq',value:'RESIDENTIAL'}},
@@ -72,7 +86,7 @@ const zeis=[
   {id:'use-ok',status:'CONFIRMED',rule_code:'USE_PERMISSION',value_text:'PERMITTED',hard_constraint:true,priority:10,condition:{field:'proposed_use',op:'eq',value:'RESIDENTIAL'}},
   {id:'his',status:'CONFIRMED',rule_code:'ZEIS_HIS_HMP_SHARE_MIN',hard_constraint:true,priority:10,value_numeric:30,unit:'%',condition:{field:'zeis_code',op:'exists'}},
 ];
-result=run(zeis,{proposed_use:'RESIDENTIAL',lot_area_m2:1000,zeis_code:'ZEIS-3',affordable_housing_share_pct:0.35});
+result=run(zeis,{proposed_use:'RESIDENTIAL',lot_area_m2:1000,zeis_code:'ZEIS-3',affordable_housing_share_pct:35});
 assert.equal(result.status,'PERMITTED');
 assert(result.checks.some(x=>x.code==='AFFORDABLE_HOUSING_SHARE_MIN'&&x.status==='PASS'));
 

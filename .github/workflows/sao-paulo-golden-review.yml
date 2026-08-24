@@ -35,12 +35,73 @@ jobs:
             --plan data/municipality-labs/sao-paulo-validation-plan.json \
             --require-not-ready \
             --output artifacts/sao-paulo-golden-candidates/readiness.json
-      - name: Select 20 official parcel candidates without inventing legal expectations
+      - name: Attempt live official parcel candidate selection
         run: |
+          mkdir -p artifacts/sao-paulo-golden-candidates
+          set +e
           python workers/data-pipelines/sao_paulo_golden_candidates.py \
             --count 20 \
+            --timeout 10 \
             --base-date "$(date -u +%F)" \
-            --output artifacts/sao-paulo-golden-candidates/candidates.json
+            --output artifacts/sao-paulo-golden-candidates/candidates.json \
+            2>artifacts/sao-paulo-golden-candidates/live-selection.stderr.log
+          rc=$?
+          set -e
+
+          if [ "$rc" -eq 0 ]; then
+            printf '{"status":"LIVE_CANDIDATES_SELECTED","production_ready":false}\n' \
+              > artifacts/sao-paulo-golden-candidates/live-source-status.json
+            exit 0
+          fi
+
+          if grep -Eq 'requests\.exceptions\.(ReadTimeout|ConnectTimeout|ConnectionError)|urllib3\.exceptions\.(ReadTimeoutError|ConnectTimeoutError)|TimeoutError: The read operation timed out' \
+            artifacts/sao-paulo-golden-candidates/live-selection.stderr.log; then
+            python - <<'PY'
+          import json
+          from datetime import datetime, timezone
+          from pathlib import Path
+
+          Path('artifacts/sao-paulo-golden-candidates/live-source-status.json').write_text(
+              json.dumps({
+                  'status': 'BLOCKED_EXTERNAL_SOURCE_UNAVAILABLE',
+                  'source': 'SP_GEOSAMPA_WFS',
+                  'observed_at': datetime.now(timezone.utc).isoformat(),
+                  'candidate_selection_complete': False,
+                  'homologation_eligible': False,
+                  'production_ready': False,
+                  'reason': 'Official GeoSampa WFS timed out or was unreachable during this run; no legal or zoning expectation was inferred.',
+              }, ensure_ascii=False, indent=2, sort_keys=True) + '\n',
+              encoding='utf-8',
+          )
+          PY
+            echo 'GeoSampa live source unavailable; recorded fail-closed evidence instead of converting availability failure into municipal truth.'
+            exit 0
+          fi
+
+          cat artifacts/sao-paulo-golden-candidates/live-selection.stderr.log >&2
+          exit "$rc"
+      - name: Assert live outcome remains fail closed
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          root = Path('artifacts/sao-paulo-golden-candidates')
+          status_path = root / 'live-source-status.json'
+          if not status_path.exists():
+              raise SystemExit('live-source-status.json missing')
+          status = json.loads(status_path.read_text(encoding='utf-8'))
+          if status.get('production_ready') is not False:
+              raise SystemExit('live selection must never declare production_ready')
+          candidates = root / 'candidates.json'
+          if status.get('status') == 'LIVE_CANDIDATES_SELECTED' and not candidates.exists():
+              raise SystemExit('selected status requires candidates.json')
+          if status.get('status') == 'BLOCKED_EXTERNAL_SOURCE_UNAVAILABLE' and candidates.exists():
+              raise SystemExit('source-unavailable status cannot publish partial candidates')
+          if status.get('status') not in {'LIVE_CANDIDATES_SELECTED', 'BLOCKED_EXTERNAL_SOURCE_UNAVAILABLE'}:
+              raise SystemExit(f'unexpected live status: {status.get("status")}')
+          print(json.dumps(status, ensure_ascii=False, sort_keys=True))
+          PY
       - name: Upload candidate and readiness evidence
         if: always()
         uses: actions/upload-artifact@v4

@@ -7,6 +7,7 @@ base = (root / 'db/platform/migrations/150_v15_territorial_core.sql').read_text(
 uses = (root / 'db/platform/migrations/192_v19_beta_legal_conditions_uses.sql').read_text()
 evaluator = (root / 'services/platform-api/src/territorial/rule-evaluator.ts').read_text()
 runtime = (root / 'services/platform-api/src/territorial/rule-runtime.ts').read_text()
+viability = (root / 'services/platform-api/src/territorial/urban-viability.ts').read_text()
 
 # Existing canonical legal/territorial base must remain intact.
 for token in [
@@ -37,12 +38,17 @@ for token in ['MATCH', 'NO_MATCH', 'UNKNOWN', 'condition.all', 'condition.any', 
 for token in ['evaluateFormula', 'evaluateRuleGraph', 'SAME_PRECEDENCE', 'required_rule_unknown', 'required_rule_not_applicable', 'division_by_zero']:
     assert token in runtime, token
 
+# Viability must not turn unknown/conflicting legal inputs into a positive answer.
+for token in ['buildUrbanViability', 'CONFLICTING', 'PROHIBITED', 'UNKNOWN', 'USE_PERMISSION', 'EIV_TRIGGER', 'OUTORGA_COST', 'AFFORDABLE_HOUSING_SHARE_MIN']:
+    assert token in viability, token
+
 # Guard the product rule: canonical bindings begin as candidates and must be reviewed.
 assert "status text NOT NULL DEFAULT 'CANDIDATE'" in migration
 assert "CHECK(status IN ('CANDIDATE','CONFIRMED','REJECTED','SUPERSEDED'))" in migration
 
-# Execute the actual TypeScript runtime (transpiled by the project TypeScript compiler)
+# Execute the actual TypeScript runtimes (transpiled by the project TypeScript compiler)
 # rather than treating string assertions as sufficient behavioral evidence.
 subprocess.run(['node', str(root / 'tests/test_v20_rule_runtime.js')], cwd=root, check=True)
+subprocess.run(['node', str(root / 'tests/test_v20_urban_viability.js')], cwd=root, check=True)
 
-print('v20 core/legal rule graph contracts OK')
+print('v20 core/legal rule graph and urban viability contracts OK')

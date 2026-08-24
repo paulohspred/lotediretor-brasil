@@ -14,10 +14,7 @@ for(const name of ['rule-evaluator','rule-runtime','urban-viability']){
 const runtime=require(path.join(tmp,'rule-runtime.js'));
 const viability=require(path.join(tmp,'urban-viability.js'));
 
-function run(rules,ctx,deps=[]){
-  const graph=runtime.evaluateRuleGraph(rules,deps,ctx,'2026-01-01');
-  return viability.buildUrbanViability(graph,ctx);
-}
+function run(rules,ctx,deps=[]){const graph=runtime.evaluateRuleGraph(rules,deps,ctx,'2026-01-01');return viability.buildUrbanViability(graph,ctx);}
 
 const baseRules=[
   {id:'use',status:'CONFIRMED',rule_code:'USE_PERMISSION',rule_family:'USE',legal_effect:'PERMISSIVE',value_text:'PERMITTED',hard_constraint:true,priority:10,condition:{field:'proposed_use',op:'eq',value:'RESIDENTIAL'}},
@@ -35,6 +32,10 @@ assert(result.calculations.some(x=>x.code==='CA_MAX'&&x.value===4000));
 result=run(baseRules,{proposed_use:'RESIDENTIAL',lot_area_m2:1000,computable_area_m2:4100,height_m:42,parking_spaces:24});
 assert.equal(result.status,'PROHIBITED');
 assert(result.checks.some(x=>x.code==='CA_MAX'&&x.status==='FAIL'));
+
+result=run(baseRules,{proposed_use:'RESIDENTIAL',lot_area_m2:1000,height_m:42,parking_spaces:24});
+assert.equal(result.status,'UNKNOWN');
+assert(result.checks.some(x=>x.code==='CA_MAX'&&x.status==='UNKNOWN'));
 
 const directRatios=[
   {id:'use-ratio',status:'CONFIRMED',rule_code:'USE_PERMISSION',value_text:'PERMITTED',hard_constraint:true,priority:10,condition:{field:'proposed_use',op:'eq',value:'RESIDENTIAL'}},
@@ -73,6 +74,14 @@ assert(result.unknownRuleIds.includes('setback'));
 result=run([],{lot_area_m2:1000});
 assert.equal(result.status,'UNKNOWN');
 assert(result.checks.some(x=>x.code==='USE_PERMISSION'&&x.reason==='proposed_use_missing'));
+
+const unsupportedHard=[
+  {id:'use-uh',status:'CONFIRMED',rule_code:'USE_PERMISSION',value_text:'PERMITTED',hard_constraint:true,priority:10,condition:{field:'proposed_use',op:'eq',value:'RESIDENTIAL'}},
+  {id:'special-hard',status:'CONFIRMED',rule_code:'SPECIAL_AIRSPACE_CONSTRAINT',value_numeric:1,unit:'flag',hard_constraint:true,priority:10},
+];
+result=run(unsupportedHard,{proposed_use:'RESIDENTIAL',lot_area_m2:1000});
+assert.equal(result.status,'UNKNOWN');
+assert(result.checks.some(x=>x.ruleId==='special-hard'&&x.reason==='unsupported_hard_constraint'));
 
 const conflictRules=[
   {id:'use-a',status:'CONFIRMED',rule_code:'USE_PERMISSION',value_text:'PERMITTED',hard_constraint:true,priority:10,condition:{field:'proposed_use',op:'eq',value:'RESIDENTIAL'}},

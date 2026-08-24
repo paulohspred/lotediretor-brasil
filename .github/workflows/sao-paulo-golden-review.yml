@@ -8,6 +8,7 @@ on:
       - data/municipality-labs/sao-paulo-validation-plan.json
       - workers/data-pipelines/municipality_golden_gate.py
       - workers/data-pipelines/sao_paulo_golden_candidates.py
+      - workers/data-pipelines/sao_paulo_golden_candidates_batch.py
       - tests/test_sao_paulo_golden_gate.py
       - .github/workflows/sao-paulo-golden-review.yml
   workflow_dispatch:
@@ -39,9 +40,9 @@ jobs:
         run: |
           mkdir -p artifacts/sao-paulo-golden-candidates
           set +e
-          python workers/data-pipelines/sao_paulo_golden_candidates.py \
+          python workers/data-pipelines/sao_paulo_golden_candidates_batch.py \
             --count 20 \
-            --timeout 10 \
+            --timeout 20 \
             --base-date "$(date -u +%F)" \
             --output artifacts/sao-paulo-golden-candidates/candidates.json \
             2>artifacts/sao-paulo-golden-candidates/live-selection.stderr.log

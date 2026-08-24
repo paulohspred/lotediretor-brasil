@@ -9,6 +9,8 @@ evaluator = (root / 'services/platform-api/src/territorial/rule-evaluator.ts').r
 runtime = (root / 'services/platform-api/src/territorial/rule-runtime.ts').read_text()
 viability = (root / 'services/platform-api/src/territorial/urban-viability.ts').read_text()
 temporal = (root / 'services/platform-api/src/territorial/legal-temporal-runtime.ts').read_text()
+analysis_v20 = (root / 'services/platform-api/src/territorial/analysis-v20.service.ts').read_text()
+controller = (root / 'services/platform-api/src/territorial/territorial.controller.ts').read_text()
 
 # Existing canonical legal/territorial base must remain intact.
 for token in [
@@ -47,6 +49,14 @@ for token in ['buildUrbanViability', 'CONFLICTING', 'PROHIBITED', 'UNKNOWN', 'US
 for token in ['resolveLegalTemporalGraph', 'SUSPENDE_EFICACIA', 'RESTAURA_EFICACIA', 'REVOGA', 'SUBSTITUI', 'opposed_confirmed_effects_same_instant', 'unknown_effective_time']:
     assert token in temporal, token
 
+# POST /analysis must compose resolver -> legal temporal graph -> rule graph -> viability decision,
+# persist calculation/evidence memory and use a new idempotency contract.
+for token in ['resolveLegalTemporalGraph', 'evaluateRuleGraph', 'buildUrbanViability', 'planning.rule_binding', 'planning.zone_use_permission', 'analysis.calculation', 'analysis.snapshot_ref', 'OVERALL_VIABILITY', 'deriveAnalysisRunStatus']:
+    assert token in analysis_v20, token
+assert "'analysis.v20'" in controller
+assert 'analysisV20.analysisWithClient' in controller
+assert 'decisionStatus' in controller
+
 # Guard the product rule: canonical bindings begin as candidates and must be reviewed.
 assert "status text NOT NULL DEFAULT 'CANDIDATE'" in migration
 assert "CHECK(status IN ('CANDIDATE','CONFIRMED','REJECTED','SUPERSEDED'))" in migration
@@ -56,5 +66,6 @@ assert "CHECK(status IN ('CANDIDATE','CONFIRMED','REJECTED','SUPERSEDED'))" in m
 subprocess.run(['node', str(root / 'tests/test_v20_rule_runtime.js')], cwd=root, check=True)
 subprocess.run(['node', str(root / 'tests/test_v20_urban_viability.js')], cwd=root, check=True)
 subprocess.run(['node', str(root / 'tests/test_v20_legal_temporal_runtime.js')], cwd=root, check=True)
+subprocess.run(['node', str(root / 'tests/test_v20_analysis_policy.js')], cwd=root, check=True)
 
-print('v20 core/legal rule graph, temporal effects and urban viability contracts OK')
+print('v20 core/legal temporal, urban viability and analysis integration contracts OK')

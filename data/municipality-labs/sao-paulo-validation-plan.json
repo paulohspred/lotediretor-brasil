@@ -1,8 +1,10 @@
 {
   "municipality_ibge": "3550308",
-  "status": "LIVE_SCHEMA_VERIFIED_READY_FOR_RUNTIME_CASE_SELECTION",
+  "status": "LIVE_CANDIDATES_SELECTED_PENDING_HUMAN_REVIEW",
   "minimum_cases": 10,
   "target_cases": 20,
+  "candidate_manifest": "data/municipality-labs/sao-paulo-golden-candidates.json",
+  "candidate_manifest_status": "CANDIDATES_ONLY_PENDING_HUMAN_REVIEW",
   "rule": "Nenhum caso recebe PASS sem referência oficial, parcela confirmada, data-base, zona e parâmetros esperados revisados por humano.",
   "source_contract": {
     "parcel_identifier_field": "cd_identificador",
@@ -12,6 +14,12 @@
     "zone_law": "18.177/2024",
     "zone_valid_from": "2024-07-26T00:00:00-03:00",
     "legal_scope_review_required": true
+  },
+  "homologation_policy": {
+    "machine_gate_can_homologate": false,
+    "professional_review_required": true,
+    "all_golden_cases_must_pass": true,
+    "production_ready_requires_separate_release_approval": true
   },
   "required_case_fields": [
     "case_code",
@@ -23,6 +31,28 @@
     "expected_parameters",
     "human_reviewer",
     "human_reviewed_at"
+  ],
+  "required_case_evidence": [
+    "parcel_snapshot_sha256",
+    "zone_snapshot_sha256",
+    "legal_snapshot_sha256",
+    "analysis_run_id",
+    "evidence_report_ref"
+  ],
+  "required_review_dimensions": [
+    "parcel_geometry",
+    "parcel_area",
+    "zone",
+    "ca",
+    "to",
+    "tp",
+    "height",
+    "setbacks",
+    "uses",
+    "restrictions",
+    "legal_temporality",
+    "analysis_reproducibility",
+    "ai_grounding"
   ],
   "coverage_targets": [
     "zonas distintas",

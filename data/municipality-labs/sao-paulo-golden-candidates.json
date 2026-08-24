@@ -1,0 +1,51 @@
+{
+  "municipality_ibge": "3550308",
+  "generated_at": "2026-08-24T11:17:40.286679+00:00",
+  "base_date": "2026-08-24",
+  "status": "CANDIDATES_ONLY_PENDING_HUMAN_REVIEW",
+  "source_profile_sha256": "5eb9207829db66dc14b9a5d850e17b726197f18ec215d7bf75c6ed5bd0494802",
+  "source": {
+    "code": "SP_GEOSAMPA_WFS",
+    "authority": "Prefeitura de São Paulo",
+    "dataset": "PARCEL",
+    "typename": "geoportal:lote_cidadao",
+    "license": "CC-BY-SA-4.0",
+    "live_number_matched": 1687671,
+    "wfs_response_sha256": "1bfeb209ca630a5f988574de73b295eba683080f0c824a0c123591604242a7e3"
+  },
+  "selection": {
+    "strategy": "stable_sorted_prefix_single_wfs_page",
+    "requested": 20,
+    "selected": 20,
+    "representative_sampling_claimed": false
+  },
+  "candidates": [
+    {"case_code":"3550308-PARCEL-1957324","official_parcel_id":"1957324","point":{"lat":-23.54336495,"lon":-46.59961016},"parcel_area_m2_observed":149,"expected_zone_code":null,"expected_parameters":{},"status":"PENDING_HUMAN_REVIEW"},
+    {"case_code":"3550308-PARCEL-1957325","official_parcel_id":"1957325","point":{"lat":-23.54340963,"lon":-46.59958423},"parcel_area_m2_observed":99,"expected_zone_code":null,"expected_parameters":{},"status":"PENDING_HUMAN_REVIEW"},
+    {"case_code":"3550308-PARCEL-1957326","official_parcel_id":"1957326","point":{"lat":-23.55109359,"lon":-46.56855367},"parcel_area_m2_observed":153,"expected_zone_code":null,"expected_parameters":{},"status":"PENDING_HUMAN_REVIEW"},
+    {"case_code":"3550308-PARCEL-1957327","official_parcel_id":"1957327","point":{"lat":-23.53158268,"lon":-46.62661579},"parcel_area_m2_observed":75,"expected_zone_code":null,"expected_parameters":{},"status":"PENDING_HUMAN_REVIEW"},
+    {"case_code":"3550308-PARCEL-1957328","official_parcel_id":"1957328","point":{"lat":-23.58334768,"lon":-46.67497345},"parcel_area_m2_observed":675,"expected_zone_code":null,"expected_parameters":{},"status":"PENDING_HUMAN_REVIEW"},
+    {"case_code":"3550308-PARCEL-1957330","official_parcel_id":"1957330","point":{"lat":-23.5358995,"lon":-46.65099335},"parcel_area_m2_observed":853,"expected_zone_code":null,"expected_parameters":{},"status":"PENDING_HUMAN_REVIEW"},
+    {"case_code":"3550308-PARCEL-1957331","official_parcel_id":"1957331","point":{"lat":-23.53596584,"lon":-46.65124292},"parcel_area_m2_observed":317,"expected_zone_code":null,"expected_parameters":{},"status":"PENDING_HUMAN_REVIEW"},
+    {"case_code":"3550308-PARCEL-1957332","official_parcel_id":"1957332","point":{"lat":-23.54813871,"lon":-46.57526464},"parcel_area_m2_observed":280,"expected_zone_code":null,"expected_parameters":{},"status":"PENDING_HUMAN_REVIEW"},
+    {"case_code":"3550308-PARCEL-1957333","official_parcel_id":"1957333","point":{"lat":-23.61043817,"lon":-46.66902158},"parcel_area_m2_observed":385,"expected_zone_code":null,"expected_parameters":{},"status":"PENDING_HUMAN_REVIEW"},
+    {"case_code":"3550308-PARCEL-1957334","official_parcel_id":"1957334","point":{"lat":-23.53411995,"lon":-46.68220866},"parcel_area_m2_observed":1694,"expected_zone_code":null,"expected_parameters":{},"status":"PENDING_HUMAN_REVIEW"},
+    {"case_code":"3550308-PARCEL-1957335","official_parcel_id":"1957335","point":{"lat":-23.52723613,"lon":-46.63443814},"parcel_area_m2_observed":440,"expected_zone_code":null,"expected_parameters":{},"status":"PENDING_HUMAN_REVIEW"},
+    {"case_code":"3550308-PARCEL-1957337","official_parcel_id":"1957337","point":{"lat":-23.54030228,"lon":-46.61643401},"parcel_area_m2_observed":474,"expected_zone_code":null,"expected_parameters":{},"status":"PENDING_HUMAN_REVIEW"},
+    {"case_code":"3550308-PARCEL-1957338","official_parcel_id":"1957338","point":{"lat":-23.53250416,"lon":-46.61201303},"parcel_area_m2_observed":136,"expected_zone_code":null,"expected_parameters":{},"status":"PENDING_HUMAN_REVIEW"},
+    {"case_code":"3550308-PARCEL-1957339","official_parcel_id":"1957339","point":{"lat":-23.56306999,"lon":-46.67501417},"parcel_area_m2_observed":270,"expected_zone_code":null,"expected_parameters":{},"status":"PENDING_HUMAN_REVIEW"},
+    {"case_code":"3550308-PARCEL-1957340","official_parcel_id":"1957340","point":{"lat":-23.58852145,"lon":-46.64006195},"parcel_area_m2_observed":66,"expected_zone_code":null,"expected_parameters":{},"status":"PENDING_HUMAN_REVIEW"},
+    {"case_code":"3550308-PARCEL-1957341","official_parcel_id":"1957341","point":{"lat":-23.59310875,"lon":-46.67655399},"parcel_area_m2_observed":130,"expected_zone_code":null,"expected_parameters":{},"status":"PENDING_HUMAN_REVIEW"},
+    {"case_code":"3550308-PARCEL-1957342","official_parcel_id":"1957342","point":{"lat":-23.5790043,"lon":-46.6187311},"parcel_area_m2_observed":240,"expected_zone_code":null,"expected_parameters":{},"status":"PENDING_HUMAN_REVIEW"},
+    {"case_code":"3550308-PARCEL-1957343","official_parcel_id":"1957343","point":{"lat":-23.57908603,"lon":-46.61888777},"parcel_area_m2_observed":75,"expected_zone_code":null,"expected_parameters":{},"status":"PENDING_HUMAN_REVIEW"},
+    {"case_code":"3550308-PARCEL-1957344","official_parcel_id":"1957344","point":{"lat":-23.56847733,"lon":-46.66176461},"parcel_area_m2_observed":751,"expected_zone_code":null,"expected_parameters":{},"status":"PENDING_HUMAN_REVIEW"},
+    {"case_code":"3550308-PARCEL-1957345","official_parcel_id":"1957345","point":{"lat":-23.55867411,"lon":-46.64825377},"parcel_area_m2_observed":196,"expected_zone_code":null,"expected_parameters":{},"status":"PENDING_HUMAN_REVIEW"}
+  ],
+  "non_claims": [
+    "Candidate selection is not municipal homologation.",
+    "This bounded stable prefix is not a statistical or geographic representativeness claim.",
+    "Observed WFS attributes are not a substitute for a published canonical snapshot.",
+    "No zone or urban parameter is inferred by this manifest.",
+    "Every PASS still requires human review and evidence required by the validation plan."
+  ]
+}

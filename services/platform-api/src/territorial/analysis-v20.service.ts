@@ -179,7 +179,7 @@ export class AnalysisV20Service{
     const snapshotIds=new Set<string>();if(parcel.source_snapshot_id)snapshotIds.add(parcel.source_snapshot_id);if(zone?.source_snapshot_id)snapshotIds.add(zone.source_snapshot_id);for(const rule of ruleRows)if(rule.source_snapshot_id)snapshotIds.add(String(rule.source_snapshot_id));for(const item of spatial.rows)if(item.source_snapshot_id)snapshotIds.add(String(item.source_snapshot_id));for(const sid of snapshotIds)await c.query(`insert into analysis.snapshot_ref(run_id,source_snapshot_id,purpose) values($1,$2,'INPUT') on conflict do nothing`,[runId,sid]);
 
     const temporalDecisionUnknown=temporalStates.filter(x=>x.rule.status==='CONFIRMED'&&x.state==='UNKNOWN').length+temporal.unknownRelationIds.length;
-    const status=deriveAnalysisRunStatus({viabilityStatus:decision.status,hasRules:runtime.selected.length>0,hasSpatialEvidence:spatial.rowCount>0,legalTemporalConflictCount:temporal.conflicts.length,legalTemporalUnknownCount:temporalDecisionUnknown});
+    const status=deriveAnalysisRunStatus({viabilityStatus:decision.status,hasRules:runtime.selected.length>0,hasSpatialEvidence:spatial.rows.length>0,legalTemporalConflictCount:temporal.conflicts.length,legalTemporalUnknownCount:temporalDecisionUnknown});
     await c.query(`update analysis.run set status=$2 where id=$1`,[runId,status]);
 
     const limitations=[
@@ -189,7 +189,7 @@ export class AnalysisV20Service{
       temporalDecisionUnknown?`${temporalDecisionUnknown} elemento(s) temporal(is) confirmado(s) não puderam ter eficácia determinada.`:null,
       runtime.unknown.length?`${runtime.unknown.length} regra(s) confirmada(s) dependem de contexto técnico ainda não informado.`:null,
       runtime.conflicts.length?`${runtime.conflicts.length} conflito(s) de regra confirmada permanecem sem resolução.`:null,
-      !spatial.rowCount?'Nenhuma camada territorial publicada dos domínios críticos intersectou a parcela.':null
+      !spatial.rows.length?'Nenhuma camada territorial publicada dos domínios críticos intersectou a parcela.':null
     ].filter(Boolean);
 
     return{status,run:{...run.rows[0],status},baseDate:at,resolver:resolved,zone,technicalContext:context,decision,legalTemporal:temporal,ruleRuntime:{selected:runtime.selected,calculated:runtime.calculated,unknown:runtime.unknown,blocked:runtime.blocked,conflicts:runtime.conflicts,trace:runtime.trace},findings,calculations:[...simple,...decision.calculations],spatial:spatial.rows,snapshotIds:[...snapshotIds],limitations};

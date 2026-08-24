@@ -1,0 +1,16 @@
+services:
+  platform-db:
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - pg_isready -h 127.0.0.1 -U ${PLATFORM_DB_MIGRATION_USER:-lotediretor} -d ${PLATFORM_DB_NAME:-lotediretor}
+      start_period: 15s
+  control-db:
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - pg_isready -h 127.0.0.1 -U ${CONTROL_DB_MIGRATION_USER:-lotediretor_control} -d ${CONTROL_DB_NAME:-lotediretor_control}
+      start_period: 15s
+  opensearch:
+    environment:
+      DISABLE_INSTALL_DEMO_CONFIG: 'true'

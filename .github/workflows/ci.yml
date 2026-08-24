@@ -21,6 +21,8 @@ jobs:
         run: |
           python tests/validate_v20_core_legal.py
           python tests/test_sao_paulo_v20_streaming_sync.py
+          python tests/validate_v20_ai_core_runtime.py
+          node tests/test_v20_ai_runtime.js
       - name: Typecheck
         run: npm run typecheck
       - name: Build

@@ -24,6 +24,7 @@ jobs:
           python tests/validate_v20_ai_core_runtime.py
           node tests/test_v20_ai_runtime.js
           node tests/test_v20_ai_retrieval_context.js
+          node tests/test_v20_ai_redteam_eval.js
       - name: Typecheck
         run: npm run typecheck
       - name: Build

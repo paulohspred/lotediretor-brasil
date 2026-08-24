@@ -2,13 +2,14 @@ import {Body,Controller,Get,HttpException,HttpStatus,Param,Post,Query,Req} from 
 import {AuthService} from '../auth.service';
 import {withIdempotency} from '../common/idempotency';
 import {enqueueOutbox} from '../common/outbox';
+import {AnalysisV20Service} from './analysis-v20.service';
 import {TerritorialService,ResolverInput} from './territorial.service';
 
 type Session={id?:string;email?:string;roles?:string[];organizationId:string;entitlements?:{modules?:string[]}};
 
 @Controller('api/v1')
 export class TerritorialController{
-  constructor(private readonly auth:AuthService,private readonly territorial:TerritorialService){}
+  constructor(private readonly auth:AuthService,private readonly territorial:TerritorialService,private readonly analysisV20:AnalysisV20Service){}
   private async session(req:any):Promise<Session>{const s=await this.auth.get(req.cookies?.ld_session) as Session|null;if(!s?.organizationId)throw new HttpException('unauthorized',HttpStatus.UNAUTHORIZED);return s;}
   private async admin(req:any){const s=await this.session(req);if(!s.roles?.includes('admin'))throw new HttpException('forbidden',403);return s;}
   private async entitled(req:any){const s=await this.session(req);const modules=Array.isArray(s.entitlements?.modules)?s.entitlements!.modules!:[];if(!s.roles?.includes('admin')&&!modules.includes('imovel360'))throw new HttpException('module_not_entitled',403);return s;}
@@ -48,14 +49,14 @@ export class TerritorialController{
   @Post('analysis')
   async analysis(@Req() req:any,@Body() body:any){
     const s=await this.entitled(req);const key=String(req.headers?.['idempotency-key']||'').trim()||undefined;const input=this.resolverInput(body);
-    const idem=await withIdempotency(this.territorial.pool,s.organizationId,'analysis.v19',key,async c=>{
+    const idem=await withIdempotency(this.territorial.pool,s.organizationId,'analysis.v20',key,async c=>{
       await c.query(`select set_config('app.tenant_id',$1,true)`,[s.organizationId]);
-      const result=await this.territorial.analysisWithClient(c,s.organizationId,input,this.territorial.baseDate(body?.baseDate),body?.context);
+      const result=await this.analysisV20.analysisWithClient(c,s.organizationId,input,this.territorial.baseDate(body?.baseDate),body?.context??body?.proposal);
       const runId=(result as any)?.run?.id;
-      if(runId)await enqueueOutbox(c,'analysis.completed',{analysisRunId:runId,status:(result as any).status,baseDate:(result as any).baseDate,parcelId:(result as any)?.resolver?.selected?.id||null},{tenantId:s.organizationId,aggregateType:'analysis.run',aggregateId:runId,dedupeKey:`analysis.completed:${runId}`});
+      if(runId)await enqueueOutbox(c,'analysis.completed',{analysisRunId:runId,status:(result as any).status,decisionStatus:(result as any)?.decision?.status||null,baseDate:(result as any).baseDate,parcelId:(result as any)?.resolver?.selected?.id||null},{tenantId:s.organizationId,aggregateType:'analysis.run',aggregateId:runId,dedupeKey:`analysis.completed:${runId}`});
       return result;
     });
-    return{...idem.value,idempotency:{replayed:idem.replayed,key:key||null}};
+    return{...idem.value,idempotency:{replayed:idem.replayed,key:key||null,contract:'analysis.v20'}};
   }
 
   @Get('analysis/:id/evidence')

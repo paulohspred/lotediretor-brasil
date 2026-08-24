@@ -66,20 +66,14 @@ function ratioAreaLimit(rule:UrbanRule|undefined,calculated:Map<string,FormulaRe
   return ratio===null||area===null?null:ratio*area;
 }
 
-function shareRatio(value:unknown){
-  const n=finite(value);
-  return n===null?null:(n>1?n/100:n);
-}
+function shareRatio(value:unknown){const n=finite(value);return n===null?null:(n>1?n/100:n);}
 
 function addMaxCheck(checks:UrbanRuleCheck[],code:string,rule:UrbanRule|undefined,actual:unknown,calculated:Map<string,FormulaResult>,unit:string,reason:string,requiredOverride?:number|null){
   if(!rule)return;
   const required=requiredOverride===undefined?ruleNumber(rule,calculated):requiredOverride;
   const actualNumber=finite(actual);
   const formulaResult=calculated.get(rule.id);
-  if(required===null||actualNumber===null){
-    checks.push({code,status:'UNKNOWN',ruleId:rule.id,actual:actualNumber,required,unit,reason:`${reason}:missing_input_or_rule_value`,formulaResult});
-    return;
-  }
+  if(required===null||actualNumber===null){checks.push({code,status:'UNKNOWN',ruleId:rule.id,actual:actualNumber,required,unit,reason:`${reason}:missing_input_or_rule_value`,formulaResult});return;}
   checks.push({code,status:actualNumber<=required?'PASS':'FAIL',ruleId:rule.id,actual:actualNumber,required,unit,reason,formulaResult});
 }
 
@@ -88,10 +82,7 @@ function addMinCheck(checks:UrbanRuleCheck[],code:string,rule:UrbanRule|undefine
   const required=requiredOverride===undefined?ruleNumber(rule,calculated):requiredOverride;
   const actualNumber=finite(actual);
   const formulaResult=calculated.get(rule.id);
-  if(required===null||actualNumber===null){
-    checks.push({code,status:'UNKNOWN',ruleId:rule.id,actual:actualNumber,required,unit,reason:`${reason}:missing_input_or_rule_value`,formulaResult});
-    return;
-  }
+  if(required===null||actualNumber===null){checks.push({code,status:'UNKNOWN',ruleId:rule.id,actual:actualNumber,required,unit,reason:`${reason}:missing_input_or_rule_value`,formulaResult});return;}
   checks.push({code,status:actualNumber>=required?'PASS':'FAIL',ruleId:rule.id,actual:actualNumber,required,unit,reason,formulaResult});
 }
 
@@ -112,23 +103,14 @@ const decisionRelevant=(rule:RuntimeRule)=>{
 export function buildUrbanViability(runtime:RuleRuntimeResult,context:UrbanViabilityContext):UrbanViabilityResult{
   const checks:UrbanRuleCheck[]=[];
   const obligations:UrbanViabilityResult['obligations']=[];
-  const calculations:UrbanCalculationMemory[]=runtime.calculated.map(item=>({
-    code:item.ruleCode||item.ruleId,
-    ruleId:item.ruleId,
-    value:item.result.value,
-    unit:(runtime.selected.find(rule=>rule.id===item.ruleId)?.unit)||null,
-    status:item.result.status,
-    unknownFields:item.result.unknownFields,
-    reasons:item.result.reasons,
-  }));
+  const calculations:UrbanCalculationMemory[]=runtime.calculated.map(item=>({code:item.ruleCode||item.ruleId,ruleId:item.ruleId,value:item.result.value,unit:(runtime.selected.find(rule=>rule.id===item.ruleId)?.unit)||null,status:item.result.status,unknownFields:item.result.unknownFields,reasons:item.result.reasons}));
   const selected=selectedByCode(runtime);
   const calculated=calculatedByRule(runtime);
   const reasons:string[]=[];
 
   const permissionRule=selected.get('USE_PERMISSION')||selected.get('USE')||selected.get('LAND_USE_PERMISSION');
-  if(!context.proposed_use){
-    checks.push({code:'USE_PERMISSION',status:'UNKNOWN',ruleId:permissionRule?.id||null,actual:null,required:null,unit:null,reason:'proposed_use_missing'});
-  }else{
+  if(!context.proposed_use)checks.push({code:'USE_PERMISSION',status:'UNKNOWN',ruleId:permissionRule?.id||null,actual:null,required:null,unit:null,reason:'proposed_use_missing'});
+  else{
     const permission=usePermission(permissionRule);
     if(!permissionRule)checks.push({code:'USE_PERMISSION',status:'UNKNOWN',ruleId:null,actual:context.proposed_use,required:null,unit:null,reason:'missing_confirmed_use_permission'});
     else if(permission==='PROHIBITED')checks.push({code:'USE_PERMISSION',status:'FAIL',ruleId:permissionRule.id,actual:context.proposed_use,required:'PROHIBITED',unit:null,reason:'confirmed_use_prohibition'});
@@ -146,32 +128,21 @@ export function buildUrbanViability(runtime:RuleRuntimeResult,context:UrbanViabi
   addMinCheck(checks,'PARKING_MIN',selected.get('PARKING_MIN')||selected.get('PARKING_MIN_SPACES'),context.parking_spaces,calculated,'spaces','minimum_parking');
 
   const caMax=selected.get('CA_MAX');
-  if(caMax&&context.computable_area_m2!==undefined)addMaxCheck(checks,'CA_MAX',caMax,context.computable_area_m2,calculated,'m²','maximum_computable_area',ratioAreaLimit(caMax,calculated,context.lot_area_m2));
+  if(caMax)addMaxCheck(checks,'CA_MAX',caMax,context.computable_area_m2,calculated,'m²','maximum_computable_area',ratioAreaLimit(caMax,calculated,context.lot_area_m2));
   const toMax=selected.get('TO_MAX');
-  if(toMax&&context.proposed_footprint_m2!==undefined)addMaxCheck(checks,'TO_MAX',toMax,context.proposed_footprint_m2,calculated,'m²','maximum_footprint',ratioAreaLimit(toMax,calculated,context.lot_area_m2));
+  if(toMax)addMaxCheck(checks,'TO_MAX',toMax,context.proposed_footprint_m2,calculated,'m²','maximum_footprint',ratioAreaLimit(toMax,calculated,context.lot_area_m2));
 
   const density=selected.get('DENSITY_MAX_U_HA');
-  if(density&&context.proposed_units!==undefined){
-    const lotArea=finite(context.lot_area_m2);
-    const actual=lotArea&&lotArea>0?Number(context.proposed_units)/(lotArea/10000):null;
-    addMaxCheck(checks,'DENSITY_MAX_U_HA',density,actual,calculated,'un/ha','maximum_density');
-  }
+  if(density){const lotArea=finite(context.lot_area_m2);const units=finite(context.proposed_units);const actual=lotArea&&lotArea>0&&units!==null?units/(lotArea/10000):null;addMaxCheck(checks,'DENSITY_MAX_U_HA',density,actual,calculated,'un/ha','maximum_density');}
 
   const affordable=selected.get('ZEIS_HIS_HMP_SHARE_MIN')||selected.get('AFFORDABLE_HOUSING_SHARE_MIN');
   if(affordable)addMinCheck(checks,'AFFORDABLE_HOUSING_SHARE_MIN',affordable,shareRatio(context.affordable_housing_share_pct),calculated,'ratio','minimum_affordable_housing_share');
 
-  for(const code of ['EIV_TRIGGER','PGT_TRIGGER','OUTORGA_REQUIRED','CEPAC_REQUIRED','TDC_REQUIRED']){
-    const rule=selected.get(code);if(!rule)continue;
-    obligations.push({code,ruleId:rule.id,value:rule.value_text??rule.value_numeric??true,unit:rule.unit||null});
-    checks.push({code,status:'CONDITION',ruleId:rule.id,actual:true,required:true,unit:rule.unit||null,reason:'confirmed_procedural_or_financial_obligation'});
-  }
-  for(const [code,rule] of selected){
-    if(!['OUTORGA_COST','OUTORGA_ESTIMATE','CEPAC_QUANTITY','CEPAC_COST','TDC_CAPACITY','TDC_VALUE'].includes(code))continue;
-    const formula=calculated.get(rule.id);
-    const value=formula?.status==='CALCULATED'?formula.value:rule.value_numeric??rule.value_text??null;
-    obligations.push({code,ruleId:rule.id,value,unit:rule.unit||null});
-    if(formula&&formula.status!=='CALCULATED')checks.push({code,status:'UNKNOWN',ruleId:rule.id,actual:null,required:null,unit:rule.unit||null,reason:'instrument_formula_not_calculated',formulaResult:formula});
-  }
+  for(const code of ['EIV_TRIGGER','PGT_TRIGGER','OUTORGA_REQUIRED','CEPAC_REQUIRED','TDC_REQUIRED']){const rule=selected.get(code);if(!rule)continue;obligations.push({code,ruleId:rule.id,value:rule.value_text??rule.value_numeric??true,unit:rule.unit||null});checks.push({code,status:'CONDITION',ruleId:rule.id,actual:true,required:true,unit:rule.unit||null,reason:'confirmed_procedural_or_financial_obligation'});}
+  for(const [code,rule] of selected){if(!['OUTORGA_COST','OUTORGA_ESTIMATE','CEPAC_QUANTITY','CEPAC_COST','TDC_CAPACITY','TDC_VALUE'].includes(code))continue;const formula=calculated.get(rule.id);const value=formula?.status==='CALCULATED'?formula.value:rule.value_numeric??rule.value_text??null;obligations.push({code,ruleId:rule.id,value,unit:rule.unit||null});if(formula&&formula.status!=='CALCULATED')checks.push({code,status:'UNKNOWN',ruleId:rule.id,actual:null,required:null,unit:rule.unit||null,reason:'instrument_formula_not_calculated',formulaResult:formula});}
+
+  const handledRuleIds=new Set(checks.map(check=>check.ruleId).filter((id):id is string=>Boolean(id)).concat(obligations.map(item=>item.ruleId)));
+  for(const rule of runtime.selected){if(rule.hard_constraint&&!handledRuleIds.has(rule.id))checks.push({code:normalized(rule.rule_code||rule.rule_family||rule.id),status:'UNKNOWN',ruleId:rule.id,actual:null,required:rule.value_numeric??rule.value_text??null,unit:rule.unit||null,reason:'unsupported_hard_constraint'});}
 
   const relevantUnknown=runtime.unknown.filter(item=>decisionRelevant(item.rule));
   const unknownRuleIds=[...new Set(relevantUnknown.map(item=>item.rule.id).concat(checks.filter(item=>item.status==='UNKNOWN'&&item.ruleId).map(item=>item.ruleId as string)))];

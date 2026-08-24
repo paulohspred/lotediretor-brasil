@@ -1,8 +1,10 @@
 {
   "municipality_ibge": "3550308",
-  "status": "LIVE_SCHEMA_VERIFIED_READY_FOR_RUNTIME_CASE_SELECTION",
+  "status": "LIVE_CANDIDATES_SELECTED_PENDING_HUMAN_REVIEW",
   "minimum_cases": 10,
   "target_cases": 20,
+  "candidate_manifest": "data/municipality-labs/sao-paulo-golden-candidates.json",
+  "candidate_manifest_status": "CANDIDATES_ONLY_PENDING_HUMAN_REVIEW",
   "rule": "Nenhum caso recebe PASS sem referência oficial, parcela confirmada, data-base, zona e parâmetros esperados revisados por humano.",
   "source_contract": {
     "parcel_identifier_field": "cd_identificador",

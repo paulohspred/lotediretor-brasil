@@ -60,6 +60,17 @@ jobs:
           docker version
           docker compose version
 
+      - name: Reclaim runner disk for full-stack images
+        run: |
+          set -euo pipefail
+          echo "Disk before cleanup:"
+          df -h
+          docker system prune -af --volumes || true
+          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /opt/hostedtoolcache/CodeQL || true
+          sudo apt-get clean
+          echo "Disk after cleanup:"
+          df -h
+
       - name: Validate compose model
         run: docker compose config >/dev/null
 

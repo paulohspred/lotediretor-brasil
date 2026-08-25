@@ -18,7 +18,7 @@ for token in [
  'source.connector_contract','municipality.factory_source','factory_discovery','factory_connector_run',
  'factory_qa_result','factory_rule_candidate','factory_golden_case','factory_golden_run',
  'factory_monitor_event','factory_coverage_snapshot','WFS','WMS','ARCGIS','CKAN','HTML','PDF','ZIP',
- 'FORCE ROW LEVEL SECURITY','factory_activation_requires_verified_license','factory_activation_requires_latest_discovery_pass',
+ "status text NOT NULL DEFAULT 'CANDIDATE'",'FORCE ROW LEVEL SECURITY','factory_activation_requires_verified_license','factory_activation_requires_latest_discovery_pass',
  'factory_homologation_requires_all_qa_pass','factory_homologation_requires_latest_golden_pass','factory_homologation_requires_complete_golden_pass',
  'factory_homologation_requires_professionally_reviewed_golden','candidate_confirmation_requires_human_review',
  'factory_terminal_run_is_immutable','refresh_factory_coverage_snapshot'
@@ -32,7 +32,7 @@ for token in ['redirect:\'manual\'','factory_payload_too_large','fetchPagedGeoJs
 controller=required[5].read_text()
 for token in [
  "@Controller('api/v1/municipality/v20/factory')", "@Post('sources/:id/discover')", "@Post('sources/:id/activate')",
- "@Post('sources/:id/ingest')", "@Post('sources/:id/snapshots/:snapshotId/qa')", "status,'CANDIDATE'",
+ "@Post('sources/:id/ingest')", "@Post('sources/:id/snapshots/:snapshotId/qa')", "return{status:'CANDIDATE'", "@Post('candidates/:candidateId/review')",
  "@Post('sources/:id/goldens/run')", "@Post('sources/:id/homologate')", "@Post('sources/:id/prepare-publication')",
  "@Post('sources/:id/monitor')", "@Get('metrics')", 'factory_homologation_blocked'
 ]: assert token in controller,token

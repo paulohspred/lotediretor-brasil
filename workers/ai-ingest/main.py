@@ -1,12 +1,15 @@
 from __future__ import annotations
 import os,time,requests,psycopg
 
+from index_schema import embedding_fingerprint,index_mapping,index_meta,index_properties
+
 DB=os.environ['PLATFORM_DATABASE_URL']
 OPENSEARCH=os.getenv('OPENSEARCH_URL','').rstrip('/')
 INDEX=os.getenv('OPENSEARCH_EVIDENCE_INDEX','lotediretor-evidence-v3')
 INTERVAL=float(os.getenv('AI_INDEX_INTERVAL_SECONDS','2'))
 EMBED_ENDPOINT=os.getenv('AI_EMBEDDINGS_ENDPOINT','').strip()
 EMBED_MODEL=os.getenv('AI_EMBEDDINGS_MODEL','').strip()
+EMBED_REVISION=os.getenv('AI_EMBEDDINGS_REVISION','').strip() or EMBED_MODEL
 EMBED_KEY=os.getenv('AI_EMBEDDINGS_API_KEY',os.getenv('AI_API_KEY','')).strip()
 EMBED_DIM=max(1,int(os.getenv('AI_EMBEDDINGS_DIMENSION','1536')))
 OS_USER=os.getenv('OPENSEARCH_USERNAME','').strip();OS_PASSWORD=os.getenv('OPENSEARCH_PASSWORD','').strip()
@@ -14,29 +17,37 @@ OS_USER=os.getenv('OPENSEARCH_USERNAME','').strip();OS_PASSWORD=os.getenv('OPENS
 
 def _auth(): return (OS_USER,OS_PASSWORD) if (OS_USER or OS_PASSWORD) else None
 
-
-def index_properties():
-    return {
-      'tenant_id':{'type':'keyword'},'domain':{'type':'keyword'},'document_id':{'type':'keyword'},'document_version_id':{'type':'keyword'},
-      'source_snapshot_id':{'type':'keyword'},'chunk_index':{'type':'integer'},'scope_id':{'type':'keyword'},'municipality_ibge':{'type':'keyword'},
-      'visibility':{'type':'keyword'},'knowledge_status':{'type':'keyword'},'retrieval_allowed':{'type':'boolean'},
-      'title':{'type':'text','analyzer':'portuguese','fields':{'keyword':{'type':'keyword','ignore_above':512}}},
-      'locator':{'type':'keyword','ignore_above':1024},'page_number':{'type':'integer'},'section_id':{'type':'keyword','ignore_above':1024},
-      'text':{'type':'text','analyzer':'portuguese'},'valid_from':{'type':'date'},'valid_to':{'type':'date'},'recorded_at':{'type':'date'},'superseded_at':{'type':'date'},
-      'metadata':{'type':'object','enabled':False},'acl':{'type':'object','enabled':False},'embedding_model':{'type':'keyword'},
-      'embedding':{'type':'knn_vector','dimension':EMBED_DIM,'method':{'name':'hnsw','space_type':'cosinesimil','engine':'lucene','parameters':{'ef_construction':128,'m':16}}}
-    }
+def _embedding_fingerprint():
+    return embedding_fingerprint(EMBED_MODEL,EMBED_REVISION,EMBED_DIM) if EMBED_MODEL else None
 
 
 def ensure_index():
     if not OPENSEARCH:return False
-    mapping={'settings':{'index':{'knn':True}},'mappings':{'dynamic':'strict','properties':index_properties()}}
+    mapping=index_mapping(EMBED_DIM,EMBED_MODEL,EMBED_REVISION)
     head=requests.head(f'{OPENSEARCH}/{INDEX}',auth=_auth(),timeout=10)
     if head.status_code==404:
         r=requests.put(f'{OPENSEARCH}/{INDEX}',json=mapping,auth=_auth(),timeout=15);r.raise_for_status();return True
     if head.status_code>=400:head.raise_for_status()
-    # Additive mapping upgrade for an existing compatible index. Dimension changes require a new index name.
-    r=requests.put(f'{OPENSEARCH}/{INDEX}/_mapping',json={'properties':index_properties()},auth=_auth(),timeout=15)
+
+    existing=requests.get(f'{OPENSEARCH}/{INDEX}/_mapping',auth=_auth(),timeout=15)
+    existing.raise_for_status();raw=existing.json()
+    descriptor=raw.get(INDEX) or next(iter(raw.values()),{})
+    mappings=descriptor.get('mappings') or {}
+    properties=mappings.get('properties') or {}
+    existing_dimension=((properties.get('embedding') or {}).get('dimension'))
+    if existing_dimension is not None and int(existing_dimension)!=EMBED_DIM:
+        raise RuntimeError(f'opensearch_embedding_dimension_mismatch:{existing_dimension}:expected:{EMBED_DIM}:rebuild_required')
+
+    expected_fingerprint=_embedding_fingerprint()
+    current_fingerprint=(mappings.get('_meta') or {}).get('embedding_fingerprint')
+    if expected_fingerprint and current_fingerprint!=expected_fingerprint:
+        raise RuntimeError(
+            f'opensearch_embedding_fingerprint_mismatch:{current_fingerprint or "missing"}:expected:{expected_fingerprint}:rebuild_required'
+        )
+
+    # Additive mapping upgrades are safe only after vector-space compatibility has been proven.
+    upgrade={'_meta':index_meta(EMBED_MODEL,EMBED_REVISION,EMBED_DIM),'properties':index_properties(EMBED_DIM)}
+    r=requests.put(f'{OPENSEARCH}/{INDEX}/_mapping',json=upgrade,auth=_auth(),timeout=15)
     if r.status_code>=400:
         raise RuntimeError(f'opensearch_mapping_upgrade_rejected:{r.text[:1200]}')
     return True
@@ -73,7 +84,14 @@ def process_one():
         # Embeddings are derived only for content allowed to participate in retrieval. Drafts remain indexed lexically-disabled
         # by retrieval_allowed=false so a later homologation can reindex safely without exposing content prematurely.
         vector=embed(text) if retrieval_allowed else None
-        if vector is not None:payload.update(embedding=vector,embedding_model=EMBED_MODEL)
+        if vector is not None:
+            payload.update(
+                embedding=vector,
+                embedding_model=EMBED_MODEL,
+                embedding_revision=EMBED_REVISION,
+                embedding_dimension=EMBED_DIM,
+                embedding_fingerprint=_embedding_fingerprint(),
+            )
         r=requests.put(f'{OPENSEARCH}/{INDEX}/_doc/{rid}',json=payload,auth=_auth(),timeout=20);r.raise_for_status()
         with c.transaction():c.execute('update ingest.document_text set indexed_at=now(),index_error=null where id=%s',(rid,))
       except Exception as exc:
@@ -87,7 +105,8 @@ def main():
       print('ai-ingest disabled: OPENSEARCH_URL not configured',flush=True)
       while True:time.sleep(60)
     ensure_index()
-    print(f'ai-ingest index={INDEX} embeddings={bool(EMBED_ENDPOINT and EMBED_MODEL and EMBED_KEY)} dimension={EMBED_DIM}',flush=True)
+    fingerprint=_embedding_fingerprint()
+    print(f'ai-ingest index={INDEX} embeddings={bool(EMBED_ENDPOINT and EMBED_MODEL and EMBED_KEY)} model={EMBED_MODEL or "none"} revision={EMBED_REVISION or "none"} dimension={EMBED_DIM} fingerprint={(fingerprint or "none")[:12]}',flush=True)
     while True:
       try:
         if not process_one():time.sleep(INTERVAL)

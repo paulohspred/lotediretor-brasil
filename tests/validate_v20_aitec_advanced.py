@@ -4,6 +4,7 @@ import subprocess
 root = Path(__file__).resolve().parents[1]
 unit_solver = (root / 'services/aitec-engine/app/unit_solver.py').read_text()
 terrain_solver = (root / 'services/aitec-engine/app/terrain_solver.py').read_text()
+building_solver = (root / 'services/aitec-engine/app/building_solver.py').read_text()
 dockerfile = (root / 'services/aitec-engine/Dockerfile').read_text()
 
 for token in [
@@ -50,7 +51,27 @@ for non_claim in [
 ]:
     assert non_claim in terrain_solver, non_claim
 
+for token in [
+    "BUILDING_SOLVER_VERSION = 'aitec-building-v20.1'",
+    'solve_building_system',
+    'CORE_FIT:',
+    'VERTICAL_COMPONENTS_FIT:',
+    'NET_FLOOR_AREA_POSITIVE:',
+    'vertical_components',
+    'core_geometry',
+    'circulation_geometry',
+]:
+    assert token in building_solver, token
+
+for non_claim in [
+    'o solver não inventa requisitos normativos',
+    'não comprovam incêndio, acessibilidade, estrutura, egress',
+    'Não substitui projeto arquitetônico',
+]:
+    assert non_claim in building_solver, non_claim
+
 assert 'COPY services/aitec-engine/app ./app' in dockerfile
 subprocess.run(['python', 'tests/test_v20_aitec_unit_solver.py'], check=True)
 subprocess.run(['python', 'tests/test_v20_aitec_terrain_tin.py'], check=True)
-print('v20 A.I TEC Unit Solver/Design DNA + TIN terrain contracts OK')
+subprocess.run(['python', 'tests/test_v20_aitec_building_solver.py'], check=True)
+print('v20 A.I TEC Unit Solver/Design DNA + TIN terrain + Building Solver contracts OK')

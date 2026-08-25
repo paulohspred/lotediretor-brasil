@@ -1,32 +1,37 @@
 {
-  "version": "v19-rc.3",
+  "version": "v20-development",
   "runtimeVersion": "19.0.0-rc.3",
-  "milestone": "CORE_CLOSURE_AITEC_ACCESS_BRANCH_PROGRAM_TERRAIN_BUILDING_SOLAR_ELECTRICAL",
+  "milestone": "V20_RUNTIME_CORE_LEGAL_AI_EVIDENCE_CLOSURE",
   "estimatesAreNotAcceptanceCriteria": true,
-  "measurementPolicy": "Track architecture, functional depth, real-data coverage and production gates separately; do not infer production readiness from file/endpoint counts.",
-  "completedInRc3": [
-    "A.I TEC explicit access/road conceptual geometry without inferred street entrance",
-    "A.I TEC geometry locks plus parent/branch/regenerate preserving locked footprints",
-    "A.I TEC unit-mix program gate with minimum-count and minimum-total shortfall",
-    "A.I TEC cut/fill conceptual estimate only from explicit metric terrain samples",
-    "A.I TEC preliminary building stack with floor plate/core/circulation geometry",
-    "A.I TEC analysis persistence and GeoJSON/CSV solution exports",
-    "tenant-consistent composite keys/foreign keys for new A.I TEC solution relationships",
-    "Solar explicit-datasheet string/MPPT preliminary electrical design",
-    "Solar regulation global-vs-tenant NULL uniqueness correction",
-    "São Paulo WFS inspection tooling decoupled from PostgreSQL/psycopg",
-    "operational JSON error reporting for municipal inspection failures",
-    "retained AI Knowledge Plane, bitemporality, hybrid retrieval foundation, evidence and high-risk gates"
+  "measurementPolicy": "Track implementation, static/CI validation, runtime evidence, real-data coverage and production/professional gates separately; never infer homologation from code existence or file/endpoint counts.",
+  "completedOrProven": [
+    "retained v19-rc.3 regression surface remains mandatory during v20 development",
+    "clean npm ci, workspace typecheck and builds execute in GitHub Actions",
+    "Core Territorial/Legal synthetic v20 golden corpus is versioned and executes real rule behavior for permitted/prohibited/unknown/conflict/temporal/setback/CEPAC/TDC/candidate cases",
+    "Core/Legal golden closure PR #41 passed CI and was merged into develop",
+    "AI Knowledge Plane retains tenant/public ACL, bitemporality, hybrid retrieval, evidence and high-risk gates",
+    "full-stack runtime workflow builds real application images and has demonstrated service health, PostgreSQL migrations, smoke checks and non-owner cross-tenant RLS isolation on GitHub-hosted Docker",
+    "OpenSearch itself has demonstrated live cluster health in the runtime workflow",
+    "São Paulo contracts/publication/canonical promotion and DB-independent WFS inspection tooling remain implemented",
+    "A.I TEC retained Site Solver/parking/access/locks/branch/unit-mix/conceptual terrain/building stack/analysis/export functionality",
+    "Solar retained explicit-datasheet string/MPPT preliminary electrical design"
   ],
-  "externalGatesStillRequired": [
-    "generate package-lock.json in registry-connected environment",
-    "clean npm ci/typecheck/build",
-    "PostgreSQL/PostGIS runtime migrations 193-196 and RLS/cross-tenant tests",
-    "Docker runtime acceptance",
-    "OpenSearch + real embedding/model/reranker providers and retrieval/security evaluation",
-    "São Paulo live WFS ingestion/promotion and 10-20 human golden-lot cases",
-    "browser E2E/accessibility",
-    "staging/load/pentest/canary/backup-restore/DR"
+  "inFlight": [
+    "PR #34: complete OpenSearch ai-ingest/retrieval isolation gate and backup/restore drill after executable-bit repair",
+    "PR #42: versioned evidence index schema/fingerprint/rebuild lifecycle plus evaluated synthetic legal reranker, while retaining all RC3 contracts",
+    "synchronize STATUS/PROGRESS/CHECKPOINT/VALIDATION evidence with v20 truth"
   ],
-  "nextMilestone": "Runtime homologation of core + São Paulo end-to-end; then A.I TEC advanced parking/TIN/Unit Solver and Solar imagery/DSM/shadow/tariff/OCR/calibration"
+  "externalOrProfessionalGatesStillRequired": [
+    "external embedding/chat provider credentials, quality, cost and fallback evaluation",
+    "São Paulo live WFS ingestion, QA, promotion and 10-20 professionally reviewed golden lots",
+    "other official/licensed source coverage with provenance and license evidence",
+    "browser E2E, mobile behavior and accessibility",
+    "production-like staging, DNS/TLS/secrets/cloud IAM and operational observability",
+    "pentest, prompt-injection/tenant-leakage security review, load/soak/capacity and canary/rollback",
+    "tested HA/DR with RPO/RTO and production backup/restore evidence",
+    "professional legal/engineering/architecture review where applicable",
+    "main branch protection (#21)"
+  ],
+  "productionHomologated": false,
+  "nextMilestone": "Close PR #34 runtime evidence and PR #42 AI lifecycle/evals, then advance São Paulo live/golden-lot and the remaining Blueprint v2.0 functional fronts without converting external gates into synthetic PASS results."
 }

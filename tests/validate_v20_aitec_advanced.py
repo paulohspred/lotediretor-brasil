@@ -1,5 +1,6 @@
 from pathlib import Path
 import subprocess
+
 root=Path(__file__).resolve().parents[1]
 paths={'unit':'unit_solver.py','terrain':'terrain_solver.py','building':'building_solver.py','basement':'basement_parking_solver.py','room':'room_solver.py','road':'road_engineering_solver.py','environment':'environment_solver.py','finance':'finance_solver.py','export':'export_solver.py','ingest':'ingest_solver.py','optimization':'optimization_solver.py'}
 files={name:(root/'services/aitec-engine/app'/path).read_text() for name,path in paths.items()}
@@ -17,6 +18,22 @@ required={
 'optimization':["OPTIMIZATION_VERSION='aitec-optimization-v20.1'",'explain_pareto','visual_geometry_diff','dominated_by','balanced_score','symmetric_difference','fingerprint']}
 for name,tokens in required.items():
     for token in tokens:assert token in files[name],token
-assert 'COPY services/aitec-engine/app ./app' in (root/'services/aitec-engine/Dockerfile').read_text()
-for test in ['tests/test_v20_aitec_unit_solver.py','tests/test_v20_aitec_terrain_tin.py','tests/test_v20_aitec_building_solver.py','tests/test_v20_aitec_basement_parking.py','tests/test_v20_aitec_room_graph.py','tests/test_v20_aitec_road_engineering.py','tests/test_v20_aitec_environment.py','tests/test_v20_aitec_finance.py','tests/test_v20_aitec_exports.py','tests/test_v20_aitec_ingest.py','tests/test_v20_aitec_optimization.py']:subprocess.run(['python',test],check=True)
-print('v20 A.I TEC full advanced implementation gate OK')
+
+api=(root/'services/aitec-engine/app/advanced_api.py').read_text()
+entrypoint=(root/'services/aitec-engine/app/entrypoint.py').read_text()
+dockerfile=(root/'services/aitec-engine/Dockerfile').read_text()
+for token in ['OP_REGISTRY','STUDY_PREPROJECT_NOT_EXECUTIVE','terrain.tin','optimization.pareto','ingest.dataset','export.ifc','serialize_result']:
+    assert token in api,token
+assert 'Depends(internal_token)' in entrypoint
+assert 'include_router(advanced_router' in entrypoint
+assert 'COPY services/aitec-engine/app ./app' in dockerfile
+assert 'app.entrypoint:app' in dockerfile
+
+for test in [
+    'tests/test_v20_aitec_unit_solver.py','tests/test_v20_aitec_terrain_tin.py','tests/test_v20_aitec_building_solver.py',
+    'tests/test_v20_aitec_basement_parking.py','tests/test_v20_aitec_room_graph.py','tests/test_v20_aitec_road_engineering.py',
+    'tests/test_v20_aitec_environment.py','tests/test_v20_aitec_finance.py','tests/test_v20_aitec_exports.py',
+    'tests/test_v20_aitec_ingest.py','tests/test_v20_aitec_optimization.py','tests/test_v20_aitec_runtime_api.py'
+]:
+    subprocess.run(['python',test],check=True)
+print('v20 A.I TEC full advanced implementation + runtime API gate OK')

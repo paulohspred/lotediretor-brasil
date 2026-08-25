@@ -38,7 +38,9 @@ class BuildingSolverV20Tests(unittest.TestCase):
             circulation = shape(floor['circulation_geometry'])
             self.assertTrue(footprint.covers(core))
             self.assertTrue(footprint.covers(circulation))
-            self.assertFalse(core.intersects(circulation))
+            # The circulation ring may share the core boundary; the geometric
+            # invariant is zero area overlap, not disjoint boundaries.
+            self.assertAlmostEqual(core.intersection(circulation).area, 0.0, places=9)
             for component in floor['vertical_components']:
                 self.assertTrue(core.covers(shape(component['geometry'])))
 

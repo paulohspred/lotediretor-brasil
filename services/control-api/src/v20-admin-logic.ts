@@ -1,7 +1,7 @@
 import {createHash} from 'crypto';
 
 export const ADMIN_SAAS_V20_VERSION='admin-saas-v20.1';
-export const SUPPORT_SCOPES=new Set(['READ_DATA','VIEW_CONFIG','BILLING_SUPPORT','IMPERSONATE_USER']);
+export const SUPPORT_SCOPES=new Set<string>(['READ_DATA','VIEW_CONFIG','BILLING_SUPPORT','IMPERSONATE_USER']);
 
 export function stableHash(value:any){return createHash('sha256').update(typeof value==='string'?value:JSON.stringify(value)).digest('hex');}
 export function money(value:any,name='amountCents'){const n=Number(value);if(!Number.isSafeInteger(n)||n<0)throw new Error(`${name}_must_be_non_negative_integer`);return n;}
@@ -42,8 +42,9 @@ export function supportSessionGate(input:any){
   const requester=String(input?.requestedBy||''),approver=String(input?.approvedBy||'');
   if(!requester||!approver)return{status:'BLOCKED',reason:'requester_and_approver_required'};
   if(requester===approver)return{status:'BLOCKED',reason:'maker_checker_violation'};
-  const scopes=[...new Set((Array.isArray(input?.scopes)?input.scopes:[]).map((x:any)=>String(x).toUpperCase()))];
-  const invalid=scopes.filter(x=>!SUPPORT_SCOPES.has(x));if(invalid.length)return{status:'BLOCKED',reason:'invalid_scope',invalid};
+  const requestedScopes:string[]=(Array.isArray(input?.scopes)?input.scopes:[]).map((x:any)=>String(x).toUpperCase());
+  const scopes:string[]=[...new Set<string>(requestedScopes)];
+  const invalid:string[]=scopes.filter((x:string)=>!SUPPORT_SCOPES.has(x));if(invalid.length)return{status:'BLOCKED',reason:'invalid_scope',invalid};
   if(!scopes.length)return{status:'BLOCKED',reason:'scope_required'};
   const now=new Date(input?.now||Date.now()),expires=new Date(input?.expiresAt);if(Number.isNaN(expires.getTime())||expires<=now)return{status:'BLOCKED',reason:'expiry_invalid'};
   const ttlMinutes=Math.round((expires.getTime()-now.getTime())/60000);if(ttlMinutes>240)return{status:'BLOCKED',reason:'support_session_ttl_exceeds_4h'};

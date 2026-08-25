@@ -27,6 +27,8 @@ RC3_INDEX_FIELD_CONTRACT={
     'municipality_ibge':{'type':'keyword'},
     'valid_from':{'type':'date'},
     'valid_to':{'type':'date'},
+    'recorded_at':{'type':'date'},
+    'superseded_at':{'type':'date'},
     'embedding':{'type':'knn_vector'},
 }
 

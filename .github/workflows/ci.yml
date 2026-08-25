@@ -23,6 +23,7 @@ jobs:
           python tests/test_sao_paulo_v20_streaming_sync.py
           python tests/validate_v20_ai_core_runtime.py
           python tests/validate_v20_aitec_advanced.py
+          python tests/validate_v20_solar.py
           node tests/test_v20_ai_runtime.js
           node tests/test_v20_ai_retrieval_context.js
           node tests/test_v20_ai_redteam_eval.js

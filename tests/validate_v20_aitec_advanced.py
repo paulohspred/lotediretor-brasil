@@ -5,6 +5,7 @@ root = Path(__file__).resolve().parents[1]
 unit_solver = (root / 'services/aitec-engine/app/unit_solver.py').read_text()
 terrain_solver = (root / 'services/aitec-engine/app/terrain_solver.py').read_text()
 building_solver = (root / 'services/aitec-engine/app/building_solver.py').read_text()
+basement_solver = (root / 'services/aitec-engine/app/basement_parking_solver.py').read_text()
 dockerfile = (root / 'services/aitec-engine/Dockerfile').read_text()
 
 for token in [
@@ -70,8 +71,29 @@ for non_claim in [
 ]:
     assert non_claim in building_solver, non_claim
 
+for token in [
+    "BASEMENT_PARKING_VERSION = 'aitec-basement-parking-v20.1'",
+    'solve_basement_parking',
+    'RAMP_REQUIRED',
+    'RAMP_MAX_SLOPE',
+    'PARKING_TOTAL_MIN',
+    'PARKING_ACCESSIBLE_MIN',
+    'PARKING_EV_MIN',
+    'column_spacing_x_m',
+    'accessible_ev_overlap',
+]:
+    assert token in basement_solver, token
+
+for non_claim in [
+    'não infer local parking, PCD, EV, ramp, fire or structural requirements',
+    'não constituem projeto estrutural',
+    'não verifica manobra por swept-path',
+]:
+    assert non_claim in basement_solver, non_claim
+
 assert 'COPY services/aitec-engine/app ./app' in dockerfile
 subprocess.run(['python', 'tests/test_v20_aitec_unit_solver.py'], check=True)
 subprocess.run(['python', 'tests/test_v20_aitec_terrain_tin.py'], check=True)
 subprocess.run(['python', 'tests/test_v20_aitec_building_solver.py'], check=True)
-print('v20 A.I TEC Unit Solver/Design DNA + TIN terrain + Building Solver contracts OK')
+subprocess.run(['python', 'tests/test_v20_aitec_basement_parking.py'], check=True)
+print('v20 A.I TEC Unit Solver/Design DNA + TIN terrain + Building Solver + basement parking contracts OK')

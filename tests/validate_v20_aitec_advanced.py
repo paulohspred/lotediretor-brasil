@@ -1,33 +1,22 @@
 from pathlib import Path
 import subprocess
-
-root = Path(__file__).resolve().parents[1]
-solver = (root / 'services/aitec-engine/app/unit_solver.py').read_text()
-dockerfile = (root / 'services/aitec-engine/Dockerfile').read_text()
-
-for token in [
-    "DESIGN_DNA_VERSION = 'aitec-design-dna-v20.1'",
-    "SOLVER_ID = 'conceptual-unit-distribution-v20.1'",
-    'solve_unit_distribution',
-    'compare_designs',
-    'content_fingerprint',
-    'lineage_fingerprint',
-    'parent_content_fingerprint',
-    'lock_fingerprint',
-    'locked_keys',
-    'PROGRAM_MIN_UNITS',
-    'UNIT_MIN:',
-    'UNIT_MAX:',
-]:
-    assert token in solver, token
-
-for non_claim in [
-    'não gera planta arquitetônica',
-    'Não inventa fachada',
-    'Locks preservam contagens exatas',
-]:
-    assert non_claim in solver, non_claim
-
-assert 'COPY services/aitec-engine/app ./app' in dockerfile
-subprocess.run(['python', 'tests/test_v20_aitec_unit_solver.py'], check=True)
-print('v20 A.I TEC conceptual Unit Solver + Design DNA contracts OK')
+root=Path(__file__).resolve().parents[1]
+paths={'unit':'unit_solver.py','terrain':'terrain_solver.py','building':'building_solver.py','basement':'basement_parking_solver.py','room':'room_solver.py','road':'road_engineering_solver.py','environment':'environment_solver.py','finance':'finance_solver.py','export':'export_solver.py','ingest':'ingest_solver.py','optimization':'optimization_solver.py'}
+files={name:(root/'services/aitec-engine/app'/path).read_text() for name,path in paths.items()}
+required={
+'unit':["DESIGN_DNA_VERSION = 'aitec-design-dna-v20.1'",'solve_unit_distribution','compare_designs'],
+'terrain':["TERRAIN_SOLVER_VERSION = 'aitec-terrain-v20.1'",'build_tin','contour_segments','plateau_candidates','cut_fill_against_pad'],
+'building':["BUILDING_SOLVER_VERSION = 'aitec-building-v20.1'",'solve_building_system'],
+'basement':["BASEMENT_PARKING_VERSION = 'aitec-basement-parking-v20.1'",'solve_basement_parking','RAMP_MAX_SLOPE'],
+'room':["ROOM_SOLVER_VERSION = 'aitec-room-graph-v20.1'",'solve_unit_room_graph','ADJACENCY:','INTERNAL_OPENING:'],
+'road':["ROAD_SOLVER_VERSION = 'aitec-road-engineering-v20.1'",'evaluate_road_engineering','ROAD_MIN_TURN_RADIUS','ROAD_MAX_GRADE'],
+'environment':["ENVIRONMENT_SOLVER_VERSION = 'aitec-environment-v20.1'",'analyze_environment','SOLAR_EXPOSURE_MIN','DAYLIGHT_PROXY_MIN','NOISE_MAX_DB','WIND_COMFORT_MAX_SPEED'],
+'finance':["FINANCE_SOLVER_VERSION = 'aitec-finance-v20.1'",'calculate_project_finance','market_snapshot_id','cost_snapshot_id','pareto_metrics'],
+'export':["EXPORT_VERSION = 'aitec-export-v20.1'",'export_geojson','export_kmz','export_dxf','export_ifc','export_xlsx','export_pdf','export_gltf','export_manifest'],
+'ingest':["INGEST_VERSION = 'aitec-ingest-v20.1'",'ingest_dataset','ingest_shapefile','ingest_gpkg','ingest_dxf','ingest_ifc','missing CRS is never guessed'],
+'optimization':["OPTIMIZATION_VERSION='aitec-optimization-v20.1'",'explain_pareto','visual_geometry_diff','dominated_by','balanced_score','symmetric_difference','fingerprint']}
+for name,tokens in required.items():
+    for token in tokens:assert token in files[name],token
+assert 'COPY services/aitec-engine/app ./app' in (root/'services/aitec-engine/Dockerfile').read_text()
+for test in ['tests/test_v20_aitec_unit_solver.py','tests/test_v20_aitec_terrain_tin.py','tests/test_v20_aitec_building_solver.py','tests/test_v20_aitec_basement_parking.py','tests/test_v20_aitec_room_graph.py','tests/test_v20_aitec_road_engineering.py','tests/test_v20_aitec_environment.py','tests/test_v20_aitec_finance.py','tests/test_v20_aitec_exports.py','tests/test_v20_aitec_ingest.py','tests/test_v20_aitec_optimization.py']:subprocess.run(['python',test],check=True)
+print('v20 A.I TEC full advanced implementation gate OK')

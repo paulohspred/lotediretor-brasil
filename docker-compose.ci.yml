@@ -14,7 +14,6 @@ services:
   opensearch:
     environment:
       DISABLE_INSTALL_DEMO_CONFIG: 'true'
-      DISABLE_SECURITY_PLUGIN: 'true'
     healthcheck:
       test:
       - CMD-SHELL
@@ -23,3 +22,17 @@ services:
       timeout: 10s
       retries: 30
       start_period: 30s
+  ai-gateway:
+    depends_on:
+      control-api:
+        condition: service_healthy
+      opensearch:
+        condition: service_healthy
+  ai-ingest:
+    depends_on:
+      platform-db:
+        condition: service_healthy
+      opensearch:
+        condition: service_healthy
+      platform-db-role-init:
+        condition: service_completed_successfully

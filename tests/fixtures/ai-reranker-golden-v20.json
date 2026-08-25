@@ -1,0 +1,60 @@
+{
+  "schemaVersion": "1.0.0",
+  "datasetId": "ai-reranker-golden-v20",
+  "truthClass": "SYNTHETIC_RETRIEVAL_ONLY",
+  "municipalTruth": false,
+  "purpose": "Evaluate deterministic legal reranking semantics without asserting municipal facts.",
+  "thresholds": {
+    "recallAtK": 1.0,
+    "mrr": 1.0,
+    "ndcgAtK": 1.0
+  },
+  "cases": [
+    {
+      "id": "law-article-exact-reference",
+      "query": "Lei 123 artigo 10 recuo frontal",
+      "relevantEvidenceIds": ["ev-law-10"],
+      "rawHits": [
+        {"id":"noise-law","score":10,"title":"Resumo genérico","locator":"nota","sectionId":"NOTE/1","text":"Texto geral sobre urbanismo sem a referência consultada."},
+        {"id":"ev-law-10","score":9,"title":"Lei 123","locator":"Art. 10","sectionId":"ARTICLE/00010","text":"Lei 123 Art. 10 recuo frontal."}
+      ]
+    },
+    {
+      "id": "coefficient-term-coverage",
+      "query": "coeficiente aproveitamento máximo lote",
+      "relevantEvidenceIds": ["ev-ca"],
+      "rawHits": [
+        {"id":"noise-ca","score":10,"title":"Documento","locator":"secao","sectionId":"SECTION/X","text":"Informação cadastral do lote."},
+        {"id":"ev-ca","score":9,"title":"Parâmetros urbanísticos","locator":"tabela","sectionId":"TABLE/CA","text":"Coeficiente de aproveitamento máximo aplicável ao lote."}
+      ]
+    },
+    {
+      "id": "licensing-trigger-coverage",
+      "query": "EIV obrigatório empreendimento 20000 m2",
+      "relevantEvidenceIds": ["ev-eiv"],
+      "rawHits": [
+        {"id":"noise-eiv","score":10,"title":"Glossário","locator":"EIV","sectionId":"GLOSSARY/EIV","text":"Definição geral de estudo de impacto."},
+        {"id":"ev-eiv","score":9,"title":"Gatilho EIV","locator":"regra","sectionId":"RULE/EIV","text":"EIV obrigatório para empreendimento com área de 20000 m2."}
+      ]
+    },
+    {
+      "id": "cepac-instrument-coverage",
+      "query": "CEPAC quantidade operação urbana",
+      "relevantEvidenceIds": ["ev-cepac"],
+      "rawHits": [
+        {"id":"noise-cepac-a","score":10,"title":"Operação urbana","locator":"intro","sectionId":"INTRO","text":"Visão geral da operação."},
+        {"id":"noise-cepac-b","score":9,"title":"Certificado","locator":"glossario","sectionId":"GLOSSARY","text":"Descrição genérica de certificado."},
+        {"id":"ev-cepac","score":8,"title":"CEPAC","locator":"cálculo","sectionId":"CALC/CEPAC","text":"CEPAC quantidade exigida na operação urbana."}
+      ]
+    },
+    {
+      "id": "easement-restriction-coverage",
+      "query": "servidão faixa não edificável",
+      "relevantEvidenceIds": ["ev-easement"],
+      "rawHits": [
+        {"id":"noise-easement","score":10,"title":"Mapa","locator":"camada","sectionId":"MAP","text":"Geometria de referência."},
+        {"id":"ev-easement","score":9,"title":"Servidão","locator":"restrição","sectionId":"RULE/EASEMENT","text":"Servidão com faixa não edificável."}
+      ]
+    }
+  ]
+}

@@ -18,8 +18,8 @@ for token in [
  'source.connector_contract','municipality.factory_source','factory_discovery','factory_connector_run',
  'factory_qa_result','factory_rule_candidate','factory_golden_case','factory_golden_run',
  'factory_monitor_event','factory_coverage_snapshot','WFS','WMS','ARCGIS','CKAN','HTML','PDF','ZIP',
- 'FORCE ROW LEVEL SECURITY','factory_activation_requires_verified_license',
- 'factory_homologation_requires_all_qa_pass','factory_homologation_requires_golden_pass',
+ 'FORCE ROW LEVEL SECURITY','factory_activation_requires_verified_license','factory_activation_requires_latest_discovery_pass',
+ 'factory_homologation_requires_all_qa_pass','factory_homologation_requires_latest_golden_pass','factory_homologation_requires_complete_golden_pass',
  'factory_homologation_requires_professionally_reviewed_golden','candidate_confirmation_requires_human_review',
  'factory_terminal_run_is_immutable','refresh_factory_coverage_snapshot'
 ]: assert token in sql,token

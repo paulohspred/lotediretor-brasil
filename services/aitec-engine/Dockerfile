@@ -4,4 +4,4 @@ COPY services/aitec-engine/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 COPY services/aitec-engine/app ./app
 EXPOSE 8002
-CMD ["uvicorn","app.main:app","--host","0.0.0.0","--port","8002"]
+CMD ["uvicorn","app.entrypoint:app","--host","0.0.0.0","--port","8002"]

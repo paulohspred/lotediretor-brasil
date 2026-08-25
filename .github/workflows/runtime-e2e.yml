@@ -92,6 +92,9 @@ jobs:
       - name: Run gateway and service smoke tests
         run: ./ops/runtime/smoke.sh
 
+      - name: Prove A.I TEC v20 advanced runtime API
+        run: ./ops/aitec/runtime-integration.sh
+
       - name: Prove non-owner cross-tenant RLS isolation
         run: ./ops/rls/runtime-isolation.sh
 
@@ -114,6 +117,7 @@ jobs:
           cp -R "$BACKUP_DIR" runtime-artifacts/backups 2>/dev/null || true
           cp /tmp/ld-opensearch-health.json runtime-artifacts/opensearch-health.json 2>/dev/null || true
           cp /tmp/ld-ai-*.json runtime-artifacts/ 2>/dev/null || true
+          cp /tmp/ld-aitec-*.json runtime-artifacts/ 2>/dev/null || true
 
       - name: Upload runtime diagnostics
         if: always()

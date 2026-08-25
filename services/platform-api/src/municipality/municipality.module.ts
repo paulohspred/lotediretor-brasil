@@ -3,6 +3,7 @@ import {CoreModule} from '../core.module';
 import {MunicipalityV20Controller} from './municipality-v20.controller';
 import {MunicipalityOpenDataV20Controller} from './municipality-open-v20.controller';
 import {MunicipalityExportV20Controller} from './municipality-export-v20.controller';
+import {MunicipalityFactoryV20Controller} from './municipality-factory.controller';
 
-@Module({imports:[CoreModule],controllers:[MunicipalityV20Controller,MunicipalityOpenDataV20Controller,MunicipalityExportV20Controller]})
+@Module({imports:[CoreModule],controllers:[MunicipalityV20Controller,MunicipalityOpenDataV20Controller,MunicipalityExportV20Controller,MunicipalityFactoryV20Controller]})
 export class MunicipalityModule{}

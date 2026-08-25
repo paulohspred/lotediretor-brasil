@@ -98,6 +98,9 @@ jobs:
       - name: Prove non-owner cross-tenant RLS isolation
         run: ./ops/rls/runtime-isolation.sh
 
+      - name: Prove Municipality Factory DB guards and tenant isolation
+        run: ./ops/municipality/factory-runtime.sh
+
       - name: Prove OpenSearch ingest and retrieval isolation
         run: ./ops/ai/runtime-integration.sh
 

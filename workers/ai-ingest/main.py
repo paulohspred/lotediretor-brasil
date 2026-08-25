@@ -20,6 +20,7 @@ OS_USER=os.getenv('OPENSEARCH_USERNAME','').strip();OS_PASSWORD=os.getenv('OPENS
 STRICT_DYNAMIC_MAPPING_CONTRACT={'dynamic':'strict'}
 RC3_INDEX_FIELD_CONTRACT={
     'tenant_id':{'type':'keyword'},
+    'document_version_id':{'type':'keyword'},
     'visibility':{'type':'keyword'},
     'knowledge_status':{'type':'keyword'},
     'retrieval_allowed':{'type':'boolean'},
@@ -68,7 +69,6 @@ def ensure_index():
             f'opensearch_embedding_fingerprint_mismatch:{current_fingerprint or "missing"}:expected:{expected_fingerprint}:rebuild_required'
         )
 
-    # Additive mapping upgrades are safe only after vector-space compatibility has been proven.
     upgrade={'_meta':index_meta(EMBED_MODEL,EMBED_REVISION,EMBED_DIM),'properties':index_properties(EMBED_DIM)}
     r=requests.put(f'{OPENSEARCH}/{INDEX}/_mapping',json=upgrade,auth=_auth(),timeout=15)
     if r.status_code>=400:
@@ -104,8 +104,6 @@ def process_one():
                   'valid_from':valid_from,'valid_to':valid_to,'recorded_at':recorded_at,'superseded_at':superseded_at,'document_version_id':document_version_id,'source_snapshot_id':source_snapshot_id}
         for k,v in optional.items():
             if v is not None:payload[k]=str(v) if k in {'document_version_id','source_snapshot_id'} else v.isoformat() if hasattr(v,'isoformat') else v
-        # Embeddings are derived only for content allowed to participate in retrieval. Drafts remain indexed lexically-disabled
-        # by retrieval_allowed=false so a later homologation can reindex safely without exposing content prematurely.
         vector=embed(text) if retrieval_allowed else None
         if vector is not None:
             payload.update(

@@ -1,39 +1,42 @@
 {
-  "version": "v19-rc.3",
+  "version": "v20-development",
   "runtimeVersion": "19.0.0-rc.3",
-  "validatedAtUtc": "2026-08-23T15:42:00Z",
-  "staticValidation": "PASS",
+  "validatedAtUtc": "2026-08-25T11:00:00Z",
+  "staticValidation": "PASS_ON_MERGED_CORE_LEGAL_BASE",
   "productionHomologated": false,
-  "checks": [
-    "retained domain regressions",
-    "territorial/legal condition and conflict safety",
-    "AI Core/Knowledge Plane contracts",
-    "AI bitemporal retrieval and registries",
-    "São Paulo lab/publication/inspection tooling",
-    "A.I TEC hard constraints/site/parking/access-lock-branch/program-terrain-building",
-    "Solar RC3 electrical design contracts",
-    "Python compile",
-    "JSON/YAML parse",
-    "TypeScript/TSX syntax parse",
-    "shell syntax",
-    "runtime/package consistency",
-    "migration topology contracts",
-    "workspace/CI/release/UI drift guards"
+  "proven": [
+    "clean npm ci in GitHub Actions",
+    "retained v19-rc.3 regression surface",
+    "workspace typecheck and builds on green CI paths",
+    "Core Territorial/Legal v20 synthetic golden corpus and real rule execution",
+    "Core/Legal PR #41 full CI and merge to develop",
+    "Docker full-stack image build",
+    "Docker Compose service health on prior runtime run",
+    "live PostgreSQL/PostGIS migrations on prior runtime run",
+    "gateway/service smoke tests on prior runtime run",
+    "non-owner cross-tenant PostgreSQL RLS isolation on prior runtime run",
+    "real OpenSearch cluster health on prior runtime run"
   ],
-  "notExecuted": [
-    "package-lock generation in registry-connected environment",
-    "clean npm ci/typecheck/build",
-    "Docker Compose E2E",
-    "PostgreSQL/PostGIS runtime migrations and RLS",
-    "OpenSearch + real embeddings/model provider integration",
-    "São Paulo live WFS ingestion/domain promotion/golden-lot human validation",
-    "browser E2E/accessibility",
-    "staging/load/pentest/canary/backup-restore/DR"
+  "inFlightNotYetPass": [
+    "PR #34 current full Docker runtime run after executable-bit fix for AI integration gate",
+    "real ai-ingest to OpenSearch evidence indexing and tenant/public/temporal retrieval assertions",
+    "backup and restore drill in the same full runtime run",
+    "PR #42 evidence-index lifecycle/fingerprint/rebuild and reranker golden evaluation CI"
   ],
-  "observedExternalBlockers": [
-    "GeoSampa live inspection reached HTTP client but DNS resolution was unavailable in this execution environment",
-    "Docker/PostgreSQL executables are not available in this execution environment"
+  "notHomologated": [
+    "external embedding/chat/model provider quality, credentials and cost controls",
+    "São Paulo live WFS ingestion/domain promotion and 10-20 human/professional golden lots",
+    "browser E2E/mobile/accessibility",
+    "production-like staging, DNS/TLS/secrets/cloud IAM",
+    "pentest/red-team/load/soak/canary/rollback",
+    "production backup/restore and HA/DR with RPO/RTO",
+    "professional legal/engineering/architecture review",
+    "main branch protection"
   ],
-  "fullValidator": "./validate-v19-rc3.sh",
-  "fullValidatorResult": "PASS"
+  "observedAdministrativeBlockers": [
+    "main branch returned protected=false on 2026-08-25; connector exposes read evidence but no branch-protection write action"
+  ],
+  "fullLegacyValidator": "./validate-v19-rc3.sh",
+  "v20Validation": "incremental validators in .github/workflows/ci.yml",
+  "acceptanceMatrix": "docs/V20_ACCEPTANCE_MATRIX.md"
 }

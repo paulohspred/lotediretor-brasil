@@ -1,39 +1,47 @@
 {
-  "version": "v19-rc.3",
+  "version": "v20-development",
   "runtimeVersion": "19.0.0-rc.3",
-  "validatedAtUtc": "2026-08-23T15:42:00Z",
+  "baselineCommit": "8802b27878d0a745dcc9290a4de2ae564265964b",
+  "validatedAtUtc": "2026-08-25T12:36:00Z",
   "staticValidation": "PASS",
+  "runtimeValidation": "PASS_LOCAL_REPRODUCIBLE_GATE",
   "productionHomologated": false,
-  "checks": [
-    "retained domain regressions",
-    "territorial/legal condition and conflict safety",
-    "AI Core/Knowledge Plane contracts",
-    "AI bitemporal retrieval and registries",
-    "São Paulo lab/publication/inspection tooling",
-    "A.I TEC hard constraints/site/parking/access-lock-branch/program-terrain-building",
-    "Solar RC3 electrical design contracts",
-    "Python compile",
-    "JSON/YAML parse",
-    "TypeScript/TSX syntax parse",
-    "shell syntax",
-    "runtime/package consistency",
-    "migration topology contracts",
-    "workspace/CI/release/UI drift guards"
+  "proven": [
+    "clean npm ci in GitHub Actions",
+    "retained v19-rc.3 regression surface",
+    "v20 incremental validators",
+    "workspace typecheck and builds",
+    "Core Territorial/Legal v20 synthetic golden corpus and real rule execution",
+    "Docker full-stack image build and Compose startup on GitHub-hosted runner",
+    "service health and routed smoke tests",
+    "live PostgreSQL/PostGIS migrations",
+    "non-owner cross-tenant PostgreSQL RLS isolation",
+    "real OpenSearch cluster health and evidence index bootstrap",
+    "real ai-ingest lexical indexing and retrieval isolation through gateway/Caddy",
+    "backup and restore drill in the same clean runtime gate",
+    "evidence index schema evidence-v20.1 and embedding-space fingerprint lifecycle",
+    "explicit refusal of incompatible vector index plus controlled rebuild/requeue tooling",
+    "synthetic reranker golden evaluation with Recall@K, MRR and NDCG",
+    "PR #34 ci 32839748000 PASS and runtime-e2e 32839747999 PASS",
+    "PR #43 ci 32840808815 PASS and runtime-e2e 32840808863 PASS"
   ],
-  "notExecuted": [
-    "package-lock generation in registry-connected environment",
-    "clean npm ci/typecheck/build",
-    "Docker Compose E2E",
-    "PostgreSQL/PostGIS runtime migrations and RLS",
-    "OpenSearch + real embeddings/model provider integration",
-    "São Paulo live WFS ingestion/domain promotion/golden-lot human validation",
-    "browser E2E/accessibility",
-    "staging/load/pentest/canary/backup-restore/DR"
+  "notHomologated": [
+    "external embedding/chat/model provider quality, credentials, cost and fallback behavior",
+    "São Paulo live WFS ingestion/domain promotion and 10-20 human/professional golden lots",
+    "other official/licensed live sources and license/provenance coverage",
+    "browser E2E/mobile/accessibility",
+    "production-like staging, DNS/TLS/secrets/cloud IAM",
+    "operational observability, SLOs, alerts and runbooks",
+    "pentest/red-team/load/soak/canary/rollback",
+    "production backup/restore and HA/DR with RPO/RTO",
+    "professional legal/engineering/architecture review",
+    "main branch protection"
   ],
-  "observedExternalBlockers": [
-    "GeoSampa live inspection reached HTTP client but DNS resolution was unavailable in this execution environment",
-    "Docker/PostgreSQL executables are not available in this execution environment"
+  "observedAdministrativeBlockers": [
+    "main branch returned protected=false on 2026-08-25; available connector does not expose branch-protection write action"
   ],
-  "fullValidator": "./validate-v19-rc3.sh",
-  "fullValidatorResult": "PASS"
+  "fullLegacyValidator": "./validate-v19-rc3.sh",
+  "v20Validation": "incremental validators in .github/workflows/ci.yml",
+  "runtimeWorkflow": ".github/workflows/runtime-e2e.yml",
+  "acceptanceMatrix": "docs/V20_ACCEPTANCE_MATRIX.md"
 }

@@ -6,6 +6,7 @@ unit_solver = (root / 'services/aitec-engine/app/unit_solver.py').read_text()
 terrain_solver = (root / 'services/aitec-engine/app/terrain_solver.py').read_text()
 building_solver = (root / 'services/aitec-engine/app/building_solver.py').read_text()
 basement_solver = (root / 'services/aitec-engine/app/basement_parking_solver.py').read_text()
+room_solver = (root / 'services/aitec-engine/app/room_solver.py').read_text()
 dockerfile = (root / 'services/aitec-engine/Dockerfile').read_text()
 
 for token in [
@@ -91,9 +92,32 @@ for non_claim in [
 ]:
     assert non_claim in basement_solver, non_claim
 
+for token in [
+    "ROOM_SOLVER_VERSION = 'aitec-room-graph-v20.1'",
+    'solve_unit_room_graph',
+    'ROOM_MIN_AREA:',
+    'ROOM_MIN_WIDTH:',
+    'ROOM_MIN_DEPTH:',
+    'ADJACENCY:',
+    'INTERNAL_OPENING:',
+    'EXTERIOR_OPENING:',
+    'ROOMS_NO_OVERLAP',
+    'ROOMS_COVER_UNIT',
+]:
+    assert token in room_solver, token
+
+for non_claim in [
+    'does not infer local',
+    'não é projeto executivo',
+    'não inventa norma local',
+    'Não resolve mobiliário, estrutura, MEP, incêndio, acessibilidade',
+]:
+    assert non_claim in room_solver, non_claim
+
 assert 'COPY services/aitec-engine/app ./app' in dockerfile
 subprocess.run(['python', 'tests/test_v20_aitec_unit_solver.py'], check=True)
 subprocess.run(['python', 'tests/test_v20_aitec_terrain_tin.py'], check=True)
 subprocess.run(['python', 'tests/test_v20_aitec_building_solver.py'], check=True)
 subprocess.run(['python', 'tests/test_v20_aitec_basement_parking.py'], check=True)
-print('v20 A.I TEC Unit Solver/Design DNA + TIN terrain + Building Solver + basement parking contracts OK')
+subprocess.run(['python', 'tests/test_v20_aitec_room_graph.py'], check=True)
+print('v20 A.I TEC Unit Solver/Design DNA + TIN terrain + Building Solver + basement parking + room graph contracts OK')

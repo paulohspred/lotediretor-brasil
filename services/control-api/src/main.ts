@@ -3,7 +3,7 @@ import { NestFactory } from '@nestjs/core';
 import { FastifyAdapter, NestFastifyApplication } from '@nestjs/platform-fastify';
 import cookie from '@fastify/cookie';
 import { join } from 'path';
-import { AppModule } from './app.module';
+import { ControlV20Module } from './v20.module';
 import { runMigrations } from './migrations';
 import { beginHttpTrace, finishHttpTrace, traceparent } from './telemetry';
 import {ApiExceptionFilter} from './common/api-exception.filter';
@@ -13,7 +13,7 @@ async function main() {
   const migrationDb = process.env.CONTROL_MIGRATION_DATABASE_URL || db;
   if (process.env.RUN_MIGRATIONS_ON_START==='true' && migrationDb) await runMigrations(migrationDb, join(process.cwd(), 'db/control/migrations'));
   if (!db) throw new Error('CONTROL_DATABASE_URL is required');
-  const app = await NestFactory.create<NestFastifyApplication>(AppModule, new FastifyAdapter({ logger: true }));
+  const app = await NestFactory.create<NestFastifyApplication>(ControlV20Module, new FastifyAdapter({ logger: true }));
   app.useGlobalFilters(new ApiExceptionFilter());
   const fastify = app.getHttpAdapter().getInstance();
   fastify.addHook('onRequest', async (req:any, reply:any) => {

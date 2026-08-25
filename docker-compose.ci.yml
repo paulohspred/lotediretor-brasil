@@ -14,3 +14,12 @@ services:
   opensearch:
     environment:
       DISABLE_INSTALL_DEMO_CONFIG: 'true'
+      DISABLE_SECURITY_PLUGIN: 'true'
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - "curl -fsS 'http://127.0.0.1:9200/_cluster/health?wait_for_status=yellow&timeout=5s' >/dev/null"
+      interval: 5s
+      timeout: 10s
+      retries: 30
+      start_period: 30s

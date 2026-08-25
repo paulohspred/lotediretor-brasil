@@ -1,0 +1,109 @@
+{
+  "version": "v20-core-legal-golden-1",
+  "truthClass": "SYNTHETIC_RULE_ENGINE",
+  "municipalTruth": false,
+  "description": "Synthetic deterministic cases for rule-engine behavior. These cases prove engine semantics and must not be represented as municipal legal truth.",
+  "cases": [
+    {
+      "id": "permitted-base-envelope",
+      "asOf": "2026-01-01",
+      "rules": [
+        {"id":"use-ok","status":"CONFIRMED","rule_code":"USE_PERMISSION","value_text":"PERMITTED","hard_constraint":true,"priority":10,"condition":{"field":"proposed_use","op":"eq","value":"RESIDENTIAL"}},
+        {"id":"ca-max","status":"CONFIRMED","rule_code":"CA_MAX","value_numeric":4,"unit":"ratio","hard_constraint":true,"priority":10},
+        {"id":"height-max","status":"CONFIRMED","rule_code":"HEIGHT_MAX_M","value_numeric":48,"unit":"m","hard_constraint":true,"priority":10},
+        {"id":"parking-min","status":"CONFIRMED","rule_code":"PARKING_MIN","value_numeric":20,"unit":"spaces","hard_constraint":true,"priority":10}
+      ],
+      "dependencies": [],
+      "context": {"proposed_use":"RESIDENTIAL","lot_area_m2":1000,"computable_area_m2":3500,"height_m":42,"parking_spaces":24},
+      "expected": {"status":"PERMITTED","selectedRuleIds":["ca-max","height-max","parking-min","use-ok"],"checks":{"USE_PERMISSION":"PASS","CA_MAX":"PASS","HEIGHT_MAX_M":"PASS","PARKING_MIN":"PASS"}}
+    },
+    {
+      "id": "confirmed-use-prohibition",
+      "asOf": "2026-01-01",
+      "rules": [
+        {"id":"use-no","status":"CONFIRMED","rule_code":"USE_PERMISSION","value_text":"PROHIBITED","hard_constraint":true,"priority":10,"condition":{"field":"proposed_use","op":"eq","value":"INDUSTRIAL"}}
+      ],
+      "dependencies": [],
+      "context": {"proposed_use":"INDUSTRIAL","lot_area_m2":1000},
+      "expected": {"status":"PROHIBITED","selectedRuleIds":["use-no"],"checks":{"USE_PERMISSION":"FAIL"}}
+    },
+    {
+      "id": "missing-computable-area-remains-unknown",
+      "asOf": "2026-01-01",
+      "rules": [
+        {"id":"use-ok","status":"CONFIRMED","rule_code":"USE_PERMISSION","value_text":"PERMITTED","hard_constraint":true,"priority":10,"condition":{"field":"proposed_use","op":"eq","value":"RESIDENTIAL"}},
+        {"id":"ca-formula","status":"CONFIRMED","rule_code":"CA_MAX","unit":"m2","hard_constraint":true,"priority":10,"formula":{"op":"multiply","args":[{"field":"lot_area_m2"},{"const":4}]}}
+      ],
+      "dependencies": [],
+      "context": {"proposed_use":"RESIDENTIAL","lot_area_m2":1000},
+      "expected": {"status":"UNKNOWN","selectedRuleIds":["ca-formula","use-ok"],"checks":{"USE_PERMISSION":"PASS","CA_MAX":"UNKNOWN"},"calculations":{"CA_MAX":4000}}
+    },
+    {
+      "id": "same-precedence-conflict-fails-closed",
+      "asOf": "2026-01-01",
+      "rules": [
+        {"id":"use-allow","status":"CONFIRMED","rule_code":"USE_PERMISSION","value_text":"PERMITTED","hard_constraint":true,"priority":10,"condition":{"field":"proposed_use","op":"eq","value":"RESIDENTIAL"}},
+        {"id":"use-deny","status":"CONFIRMED","rule_code":"USE_PERMISSION","value_text":"PROHIBITED","hard_constraint":true,"priority":10,"condition":{"field":"proposed_use","op":"eq","value":"RESIDENTIAL"}}
+      ],
+      "dependencies": [],
+      "context": {"proposed_use":"RESIDENTIAL","lot_area_m2":1000},
+      "expected": {"status":"CONFLICTING","selectedRuleIds":[],"conflictRuleIds":["use-allow","use-deny"]}
+    },
+    {
+      "id": "height-dependent-front-setback",
+      "asOf": "2026-01-01",
+      "rules": [
+        {"id":"use-ok","status":"CONFIRMED","rule_code":"USE_PERMISSION","value_text":"PERMITTED","hard_constraint":true,"priority":10,"condition":{"field":"proposed_use","op":"eq","value":"RESIDENTIAL"}},
+        {"id":"front-setback","status":"CONFIRMED","rule_code":"FRONT_SETBACK_MIN_M","unit":"m","hard_constraint":true,"priority":10,"condition":{"field":"height_m","op":"gte","value":30},"formula":{"op":"add","args":[{"const":3},{"op":"multiply","args":[{"field":"height_m"},{"const":0.1}]}]}}
+      ],
+      "dependencies": [],
+      "context": {"proposed_use":"RESIDENTIAL","lot_area_m2":1000,"height_m":40,"front_setback_m":8},
+      "expected": {"status":"PERMITTED","selectedRuleIds":["front-setback","use-ok"],"checks":{"USE_PERMISSION":"PASS","FRONT_SETBACK_MIN_M":"PASS"},"calculations":{"FRONT_SETBACK_MIN_M":7}}
+    },
+    {
+      "id": "cepac-obligation-and-memory",
+      "asOf": "2026-01-01",
+      "rules": [
+        {"id":"use-ok","status":"CONFIRMED","rule_code":"USE_PERMISSION","value_text":"PERMITTED","hard_constraint":true,"priority":10,"condition":{"field":"proposed_use","op":"eq","value":"RESIDENTIAL"}},
+        {"id":"cepac-required","status":"CONFIRMED","rule_code":"CEPAC_REQUIRED","legal_effect":"PROCEDURAL","value_text":"REQUIRED","priority":20},
+        {"id":"cepac-qty","status":"CONFIRMED","rule_code":"CEPAC_QUANTITY","legal_effect":"COMPUTATIONAL","unit":"CEPAC","priority":20,"formula":{"op":"ceil","args":[{"op":"divide","args":[{"field":"proposed_gfa_m2"},{"const":100}]}]}}
+      ],
+      "dependencies": [],
+      "context": {"proposed_use":"RESIDENTIAL","lot_area_m2":1000,"proposed_gfa_m2":25001},
+      "expected": {"status":"CONDITIONED","selectedRuleIds":["cepac-qty","cepac-required","use-ok"],"checks":{"CEPAC_REQUIRED":"CONDITION","USE_PERMISSION":"PASS"},"obligations":{"CEPAC_QUANTITY":251},"calculations":{"CEPAC_QUANTITY":251}}
+    },
+    {
+      "id": "tdc-obligation-and-memory",
+      "asOf": "2026-01-01",
+      "rules": [
+        {"id":"use-ok","status":"CONFIRMED","rule_code":"USE_PERMISSION","value_text":"PERMITTED","hard_constraint":true,"priority":10,"condition":{"field":"proposed_use","op":"eq","value":"RESIDENTIAL"}},
+        {"id":"tdc-required","status":"CONFIRMED","rule_code":"TDC_REQUIRED","legal_effect":"PROCEDURAL","value_text":"REQUIRED","priority":20},
+        {"id":"tdc-capacity","status":"CONFIRMED","rule_code":"TDC_CAPACITY","legal_effect":"COMPUTATIONAL","unit":"m2","priority":20,"formula":{"op":"multiply","args":[{"field":"lot_area_m2"},{"const":0.5}]}}
+      ],
+      "dependencies": [],
+      "context": {"proposed_use":"RESIDENTIAL","lot_area_m2":1200},
+      "expected": {"status":"CONDITIONED","selectedRuleIds":["tdc-capacity","tdc-required","use-ok"],"checks":{"TDC_REQUIRED":"CONDITION","USE_PERMISSION":"PASS"},"obligations":{"TDC_CAPACITY":600},"calculations":{"TDC_CAPACITY":600}}
+    },
+    {
+      "id": "candidate-rule-never-becomes-confirmed-truth",
+      "asOf": "2026-01-01",
+      "rules": [
+        {"id":"candidate-use","status":"CANDIDATE","rule_code":"USE_PERMISSION","value_text":"PERMITTED","hard_constraint":true,"priority":10,"condition":{"field":"proposed_use","op":"eq","value":"RESIDENTIAL"}}
+      ],
+      "dependencies": [],
+      "context": {"proposed_use":"RESIDENTIAL","lot_area_m2":1000},
+      "expected": {"status":"UNKNOWN","selectedRuleIds":[],"ignoredRuleIds":["candidate-use"],"checks":{"USE_PERMISSION":"UNKNOWN"}}
+    },
+    {
+      "id": "effective-date-excludes-expired-rule",
+      "asOf": "2026-01-01",
+      "rules": [
+        {"id":"expired-deny","status":"CONFIRMED","rule_code":"USE_PERMISSION","value_text":"PROHIBITED","hard_constraint":true,"priority":1,"valid_to":"2025-01-01","condition":{"field":"proposed_use","op":"eq","value":"RESIDENTIAL"}},
+        {"id":"current-allow","status":"CONFIRMED","rule_code":"USE_PERMISSION","value_text":"PERMITTED","hard_constraint":true,"priority":10,"valid_from":"2025-01-01","condition":{"field":"proposed_use","op":"eq","value":"RESIDENTIAL"}}
+      ],
+      "dependencies": [],
+      "context": {"proposed_use":"RESIDENTIAL","lot_area_m2":1000},
+      "expected": {"status":"PERMITTED","selectedRuleIds":["current-allow"],"outOfTimeRuleIds":["expired-deny"],"checks":{"USE_PERMISSION":"PASS"}}
+    }
+  ]
+}

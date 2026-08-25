@@ -1,38 +1,37 @@
-# Status — v19-rc.3
+# Status — v20 development
 
-## Marco atual
+## Estado atual
 
-**Core Closure + A.I TEC Access/Branch/Program/Terrain/Building + Solar Electrical Preliminary.** A RC3 preserva a fundação territorial/jurídica e o AI Knowledge Plane anteriores e fecha o escopo técnico anunciado para esta etapa sem declarar homologação de produção.
+O repositório está em desenvolvimento v20 sobre o runtime versionado `19.0.0-rc.3`, preservando toda a superfície de regressão RC3 enquanto os contratos v20 são aprofundados. **Implementação, CI, runtime, dados reais e homologação profissional/produção são gates separados.** `productionHomologated = false`.
 
-## Implementado e coberto por testes locais
+## Evidência já obtida
 
-- runtime/workspaces normalizados em `19.0.0-rc.3`;
-- CI e release gate apontam para `validate-v19-rc3.sh`;
-- regressões históricas permanecem obrigatórias;
-- A.I TEC: Site Solver, parking geométrico, acesso/road conceitual explícito, locks, branch/regenerate, unit mix, cut/fill por amostra, Building Stack, analyses e exports;
-- Solar: string/MPPT preliminar somente com dados elétricos fornecidos/catálogo explícito;
-- AI Core: Knowledge Plane, bitemporalidade, hybrid retrieval foundation, registry, evidence/high-risk gates;
-- São Paulo: contratos lote/zona, publicação por dataset, promoção canônica e inspeção WFS desacoplada de DB;
-- tenant/RLS e provenance continuam obrigatórios nas novas tabelas RC3.
+- `package-lock.json`, `npm ci`, typecheck e builds são executados de forma reproduzível no GitHub Actions;
+- Core Territorial/Legal ganhou corpus golden v20 sintético e versionado cobrindo decisão permitida/proibida/desconhecida, conflitos, temporalidade, recuo dependente de altura, CEPAC, TDC e bloqueio de regra `CANDIDATE`; o PR #41 passou CI e foi mergeado em `develop`;
+- AI Core preserva Knowledge Plane, ACL/tenant, bitemporalidade, retrieval lexical/híbrido com RRF, reranker legal, registries, evidence gates e high-risk deterministic-rule gate;
+- o runtime Docker full-stack já demonstrou health dos serviços, migrations PostgreSQL/PostGIS, smoke pelo gateway e isolamento RLS cross-tenant com application role não-owner;
+- OpenSearch real já demonstrou cluster health no gate de runtime;
+- São Paulo preserva contratos de lote/zona, publicação por dataset, promoção canônica e inspeção WFS desacoplada do banco;
+- A.I TEC preserva Site Solver, parking, acesso explícito, locks/branch/regenerate, unit mix, cut/fill conceitual, Building Stack, análises e exports;
+- Solar preserva o design elétrico preliminar string/MPPT somente com dados explícitos.
 
-## O que esta RC não afirma resolver
+## Fechamentos em andamento
 
-A.I TEC ainda não é projeto executivo e não fecha: viário de engenharia com raios de giro/emergência; garagem de subsolo/rampas/pilares; TIN/DEM real e terraplenagem de engenharia; floor plans completos; Design DNA; daylight/vento/ruído avançados; IFC/DWG/BIM completo. Solar ainda não fecha imagery/DSM/roof extraction/shadows 3D calibradas/OCR de conta/tarifas e regulação completas/grid interconnection/estrutura. Esses limites são mantidos explicitamente no código e nos relatórios.
+O PR #34 executa o gate Docker E2E completo. A causa da falha anterior do passo AI/OpenSearch foi identificada: `ops/ai/runtime-integration.sh` havia sido adicionado com modo Git `100644`, embora o workflow o executasse diretamente. O modo foi corrigido para `100755`; o novo run deve provar ingest/retrieval e então alcançar o drill de backup/restore. Isso ainda não é registrado como PASS até o run terminar verde.
 
-## São Paulo ao vivo
+O PR #42 implementa lifecycle reproduzível do índice de evidências: schema versionado, fingerprint de espaço vetorial por modelo/revisão/dimensão, recusa de índice incompatível, rebuild/requeue explícito e golden eval do reranker real. A compatibilidade RC3 permanece obrigatória e está sendo validada pelo CI antes de qualquer merge.
 
-A ferramenta de inspeção agora roda sem exigir banco. A tentativa neste ambiente alcançou a chamada HTTP, mas falhou por **DNS/rede externa indisponível** ao resolver `wfs.geosampa.prefeitura.sp.gov.br`. Portanto nenhum dado ao vivo foi ingerido ou homologado aqui. Permanecem necessários sync real, QA, promoção lote/zona e 10–20 golden lots revisados por profissional.
+## São Paulo e fontes reais
 
-## Gates externos pendentes
+Nenhum dado municipal deve ser marcado como oficial ou homologado a partir de fixtures sintéticas. Continuam pendentes: acesso live ao GeoSampa, sync com CRS/provenance, QA, promoção canônica e 10–20 golden lots revisados por profissional, além das avaliações legais temporais/citação/abstenção sobre fontes reais.
 
-1. `package-lock.json` real, `npm ci`, typecheck e builds;
-2. PostgreSQL/PostGIS real com migrations RC3 e testes RLS/cross-tenant;
-3. Docker Compose E2E;
-4. OpenSearch + embeddings/model/reranker reais e evals;
-5. GeoSampa live e golden lots de São Paulo;
-6. browser E2E e acessibilidade;
-7. staging, carga, pentest, canary, backup/restore e DR.
+## Gates externos ainda pendentes
 
-## Próxima prioridade após RC3
+Permanecem fora de qualquer declaração de produção: providers externos de IA avaliados; browser/mobile/a11y; pentest e red-team operacional; load/soak/capacity; staging production-like; DNS/TLS/secrets/cloud IAM; observabilidade/SLO/runbooks; canary/rollback; backup/restore e DR de produção com RPO/RTO; LGPD; e revisões profissional, jurídica, engenharia e arquitetura aplicáveis. A branch `main` também foi observada com `protected=false` em 2026-08-25 e requer o gate administrativo #21.
 
-Fechar o runtime real do núcleo e São Paulo ponta a ponta antes de expandir agressivamente: DB/runtime → GeoSampa/golden lots → retrieval/provider reais → browser E2E. Em paralelo, a próxima profundidade funcional do A.I TEC é garagem avançada/TIN/Building+Unit Solver; do Solar é imagery/DSM/shadow/tariff/OCR/calibration.
+## Próxima ordem de fechamento
+
+1. tornar PR #34 totalmente verde e integrar o runtime gate;
+2. validar PR #42 sobre a base atualizada, incluindo runtime depois que o workflow estiver em `develop`;
+3. atualizar evidência/trackers e encerrar apenas issues cujos critérios estejam efetivamente provados;
+4. avançar São Paulo live/golden lots e os demais blocos do Blueprint v2.0 sem converter falta de fonte, credencial ou revisão humana em resultado sintético.

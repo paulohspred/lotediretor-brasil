@@ -1,0 +1,48 @@
+name: blueprint-analysis
+
+on:
+  pull_request:
+    branches: [develop]
+    paths:
+      - '.github/workflows/blueprint-analysis.yml'
+      - 'docs/blueprint/**'
+
+jobs:
+  extract-blueprint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install PDF parser
+        run: pip install pypdf
+      - name: Extract Blueprint v2.0 page text
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import json
+          from pypdf import PdfReader
+
+          source = Path('docs/blueprint/LoteDiretor_Brasil_Blueprint_Final_v2.0.pdf')
+          out = Path('blueprint-analysis')
+          out.mkdir(exist_ok=True)
+          reader = PdfReader(str(source))
+          rows = []
+          with (out / 'blueprint-pages.txt').open('w', encoding='utf-8') as txt:
+              for number, page in enumerate(reader.pages, start=1):
+                  text = page.extract_text() or ''
+                  text = text.replace('\u0000', '').strip()
+                  txt.write(f'\n===== PAGE {number} / {len(reader.pages)} =====\n')
+                  txt.write(text)
+                  txt.write('\n')
+                  rows.append({'page': number, 'text': text})
+          (out / 'blueprint-pages.json').write_text(json.dumps(rows, ensure_ascii=False, indent=2), encoding='utf-8')
+          (out / 'metadata.json').write_text(json.dumps({'pages': len(reader.pages), 'source': str(source)}, indent=2), encoding='utf-8')
+          print('pages', len(reader.pages))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: blueprint-v20-analysis-text
+          path: blueprint-analysis/
+          retention-days: 1

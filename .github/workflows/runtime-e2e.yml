@@ -1,0 +1,129 @@
+name: runtime-e2e
+
+on:
+  pull_request:
+    branches: [develop, main]
+  push:
+    branches: [develop, main]
+  workflow_dispatch:
+
+concurrency:
+  group: runtime-e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  docker-runtime:
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    env:
+      COMPOSE_PROJECT_NAME: lotediretor_ci
+      COMPOSE_FILE: docker-compose.yml:docker-compose.ci.yml
+      COMPOSE_PROFILES: full
+      COMPOSE_PARALLEL_LIMIT: 2
+      HTTP_PORT: 8080
+      PLATFORM_DB_MIGRATION_USER: lotediretor
+      PLATFORM_DB_MIGRATION_PASSWORD: ci-platform-owner-2026
+      PLATFORM_DB_NAME: lotediretor
+      PLATFORM_DB_APP_USER: lotediretor_app
+      PLATFORM_DB_APP_PASSWORD: ci-platform-app-2026
+      PLATFORM_DB_TILES_USER: lotediretor_tiles
+      PLATFORM_DB_TILES_PASSWORD: ci-platform-tiles-2026
+      PLATFORM_DB_EVENT_PASSWORD: ci-platform-event-2026
+      PLATFORM_DB_WORKER_PASSWORD: ci-platform-worker-2026
+      CONTROL_DB_MIGRATION_USER: lotediretor_control
+      CONTROL_DB_MIGRATION_PASSWORD: ci-control-owner-2026
+      CONTROL_DB_NAME: lotediretor_control
+      CONTROL_DB_APP_USER: lotediretor_control_app
+      CONTROL_DB_APP_PASSWORD: ci-control-app-2026
+      CONTROL_DB_WORKER_PASSWORD: ci-control-worker-2026
+      S3_ACCESS_KEY: lotediretor_ci
+      S3_SECRET_KEY: ci-object-storage-secret-2026
+      S3_BUCKET: lotediretor-ci
+      INTERNAL_API_TOKEN: ci-internal-api-token-2026
+      KEYCLOAK_ADMIN: ci-admin
+      KEYCLOAK_ADMIN_PASSWORD: ci-keycloak-admin-2026
+      OIDC_CLIENT_ID: lotediretor-app
+      OIDC_CLIENT_SECRET: ci-oidc-client-secret-2026
+      SESSION_COOKIE_SECURE: 'false'
+      ALLOW_LOCAL_AUTO_MEMBERSHIP: 'true'
+      BACKUP_DIR: ./backups-ci
+      BACKUP_RETENTION_DAYS: 0
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Show Docker versions
+        run: |
+          docker version
+          docker compose version
+
+      - name: Reclaim runner disk for full-stack images
+        run: |
+          set -euo pipefail
+          echo "Disk before cleanup:"
+          df -h
+          docker system prune -af --volumes || true
+          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /opt/hostedtoolcache/CodeQL || true
+          sudo apt-get clean
+          echo "Disk after cleanup:"
+          df -h
+
+      - name: Validate compose model
+        run: docker compose config >/dev/null
+
+      - name: Build application images reproducibly
+        run: docker compose build
+
+      - name: Start runtime stack
+        run: docker compose up -d
+
+      - name: Wait for healthy runtime
+        run: ./ops/runtime/wait-healthy.sh 420
+
+      - name: Verify schema migrations completed
+        run: |
+          set -euo pipefail
+          docker compose exec -T platform-db psql -U "$PLATFORM_DB_MIGRATION_USER" -d "$PLATFORM_DB_NAME" -v ON_ERROR_STOP=1 -c "select count(*) as platform_migrations from public.schema_migrations;"
+          docker compose exec -T control-db psql -U "$CONTROL_DB_MIGRATION_USER" -d "$CONTROL_DB_NAME" -v ON_ERROR_STOP=1 -c "select count(*) as control_migrations from public.schema_migrations;"
+
+      - name: Run gateway and service smoke tests
+        run: ./ops/runtime/smoke.sh
+
+      - name: Prove non-owner cross-tenant RLS isolation
+        run: ./ops/rls/runtime-isolation.sh
+
+      - name: Prove OpenSearch ingest and retrieval isolation
+        run: ./ops/ai/runtime-integration.sh
+
+      - name: Run backup and restore drill
+        run: |
+          stamp="ci-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          ./ops/backup/backup.sh "$stamp"
+          ./ops/backup/restore-drill.sh "$BACKUP_DIR/$stamp"
+
+      - name: Capture runtime diagnostics
+        if: always()
+        run: |
+          mkdir -p runtime-artifacts
+          docker compose ps -a > runtime-artifacts/compose-ps.txt 2>&1 || true
+          docker compose logs --no-color --timestamps > runtime-artifacts/compose.log 2>&1 || true
+          docker system df > runtime-artifacts/docker-df.txt 2>&1 || true
+          cp -R "$BACKUP_DIR" runtime-artifacts/backups 2>/dev/null || true
+          cp /tmp/ld-opensearch-health.json runtime-artifacts/opensearch-health.json 2>/dev/null || true
+          cp /tmp/ld-ai-*.json runtime-artifacts/ 2>/dev/null || true
+
+      - name: Upload runtime diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: runtime-e2e-${{ github.run_id }}-${{ github.run_attempt }}
+          path: runtime-artifacts
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Tear down runtime
+        if: always()
+        run: docker compose down -v --remove-orphans

@@ -5,6 +5,8 @@ DB=os.environ['PLATFORM_DATABASE_URL']
 OPENSEARCH=os.getenv('OPENSEARCH_URL','').rstrip('/')
 INDEX=os.getenv('OPENSEARCH_EVIDENCE_INDEX','lotediretor-evidence-v3')
 INTERVAL=float(os.getenv('AI_INDEX_INTERVAL_SECONDS','2'))
+BOOTSTRAP_TIMEOUT=max(5.0,float(os.getenv('AI_INDEX_BOOTSTRAP_TIMEOUT_SECONDS','180')))
+BOOTSTRAP_RETRY=max(0.5,float(os.getenv('AI_INDEX_BOOTSTRAP_RETRY_SECONDS','3')))
 EMBED_ENDPOINT=os.getenv('AI_EMBEDDINGS_ENDPOINT','').strip()
 EMBED_MODEL=os.getenv('AI_EMBEDDINGS_MODEL','').strip()
 EMBED_KEY=os.getenv('AI_EMBEDDINGS_API_KEY',os.getenv('AI_API_KEY','')).strip()
@@ -40,6 +42,21 @@ def ensure_index():
     if r.status_code>=400:
         raise RuntimeError(f'opensearch_mapping_upgrade_rejected:{r.text[:1200]}')
     return True
+
+
+def wait_for_index():
+    deadline=time.monotonic()+BOOTSTRAP_TIMEOUT
+    attempt=0
+    while True:
+      attempt+=1
+      try:
+        return ensure_index()
+      except requests.exceptions.RequestException as exc:
+        remaining=deadline-time.monotonic()
+        if remaining<=0:
+          raise RuntimeError(f'opensearch_bootstrap_timeout_after_{attempt}_attempts') from exc
+        print(f'ai-ingest waiting for OpenSearch attempt={attempt} error={type(exc).__name__}',flush=True)
+        time.sleep(min(BOOTSTRAP_RETRY,remaining))
 
 
 def embed(text:str):
@@ -86,7 +103,7 @@ def main():
     if not OPENSEARCH:
       print('ai-ingest disabled: OPENSEARCH_URL not configured',flush=True)
       while True:time.sleep(60)
-    ensure_index()
+    wait_for_index()
     print(f'ai-ingest index={INDEX} embeddings={bool(EMBED_ENDPOINT and EMBED_MODEL and EMBED_KEY)} dimension={EMBED_DIM}',flush=True)
     while True:
       try:

@@ -78,5 +78,6 @@ subprocess.run(['node', str(root / 'tests/test_v20_spatial_context.js')], cwd=ro
 subprocess.run(['node', str(root / 'tests/test_v20_spatial_viability.js')], cwd=root, check=True)
 subprocess.run(['node', str(root / 'tests/test_v20_legal_temporal_runtime.js')], cwd=root, check=True)
 subprocess.run(['node', str(root / 'tests/test_v20_analysis_policy.js')], cwd=root, check=True)
+subprocess.run(['node', str(root / 'tests/test_v20_core_legal_golden.js')], cwd=root, check=True)
 
-print('v20 core/legal temporal, spatial constraints, urban viability and analysis integration contracts OK')
+print('v20 core/legal temporal, spatial constraints, urban viability, golden corpus and analysis integration contracts OK')

@@ -13,6 +13,7 @@ function date(v:any){const s=String(v||new Date().toISOString().slice(0,10));if(
 export class CondoV20Controller{
   constructor(private readonly auth:AuthService){}
   private async session(req:any,manager=false){const s=await this.auth.get(req.cookies?.ld_session);if(!s?.organizationId)throw new HttpException('unauthorized',401);const modules=Array.isArray(s.entitlements?.modules)?s.entitlements.modules:[];if(!s.roles?.includes('admin')&&!modules.includes('condominio'))throw new HttpException('module_not_entitled',403);if(manager&&!s.roles?.some((r:string)=>r==='admin'||r==='condo_manager'))throw new HttpException('forbidden',403);return s;}
+  private async manager(req:any){return this.session(req,true);}
   private async own(c:any,id:string,tenant:string){const r=await c.query(`select id,name,kind,municipality_ibge from condo.condominium where id=$1 and tenant_id=$2`,[id,tenant]);if(!r.rowCount)throw new HttpException('condominium_not_found',404);return r.rows[0];}
 
   @Post('documents/:documentId/parse-clauses')

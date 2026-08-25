@@ -22,6 +22,32 @@ check ai-health "$BASE_URL/ai/health"
 check solar-health "$BASE_URL/solar/health"
 check aitec-health "$BASE_URL/aitec/health"
 
+# Exercise the Solar 360 v20 plane through the real gateway and the same
+# machine-to-machine token used by platform services. The ld-ai-* prefix is
+# intentional: runtime-e2e already preserves these JSONs as evidence artifacts.
+printf '%-24s ' solar-v20-runtime
+curl -fsS --max-time 20 -H "X-Internal-Token: ${INTERNAL_API_TOKEN:?INTERNAL_API_TOKEN required}" \
+  "$BASE_URL/solar/v20/capabilities" > /tmp/ld-ai-solar-v20-capabilities.json
+curl -fsS --max-time 20 -H "X-Internal-Token: $INTERNAL_API_TOKEN" -H 'Content-Type: application/json' \
+  -X POST "$BASE_URL/solar/v20/execute/energy.irradiance" \
+  --data '{"kwargs":{"dc_kwp":10,"monthly_poa_kwh_m2":[100,100,100,100,100,100,100,100,100,100,100,100],"loss_fractions":{"temperature":0.02,"soiling":0.02,"shading":0.02,"mismatch":0.02,"wiring":0.02,"inverter":0.02,"availability":0.02}}}' \
+  > /tmp/ld-ai-solar-v20-energy.json
+python3 - <<'PY'
+import json
+caps=json.load(open('/tmp/ld-ai-solar-v20-capabilities.json'))
+energy=json.load(open('/tmp/ld-ai-solar-v20-energy.json'))
+ops={item['operation'] for item in caps['operations']}
+required={'source.validate','dsm.roof-surfaces','dsm.obstacles','shadow.project','energy.irradiance','battery.simulate','tariff.apply','connection.precheck','ground-mount.layout','safety.conditioning','calibration.compare','bill.parse-ocr','equipment.snapshot','scene.build','report.build'}
+missing=sorted(required-ops)
+assert not missing, missing
+assert caps['classification']=='PRELIMINARY_ENGINEERING_STUDY'
+assert energy['status']=='EXECUTED', energy
+assert energy['solver_version']=='solar-scenario-v20.1', energy
+assert energy['result']['status']=='CALCULATED_FROM_EXPLICIT_IRRADIANCE_AND_LOSSES', energy
+assert energy['result']['annual_net_kwh'] > 0, energy
+PY
+echo PASS
+
 # Direct service ports are intentionally not published at the host edge.
 # Inspect Docker state/health for every service participating in this Compose run.
 docker compose ps -a --format json > /tmp/ld-compose-ps.json

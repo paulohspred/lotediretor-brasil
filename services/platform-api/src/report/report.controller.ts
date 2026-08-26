@@ -7,6 +7,7 @@ import {withIdempotency} from '../common/idempotency';
 import {enqueueOutbox} from '../common/outbox';
 
 const pool=new Pool({connectionString:process.env.PLATFORM_DATABASE_URL});
+const TERMINAL_ANALYSIS_STATUSES=new Set(['COMPLETED','NEEDS_REVIEW','INSUFFICIENT_DATA']);
 
 function reportBaseDate(value:any){
   if(value==null||value==='')return null;
@@ -41,7 +42,8 @@ export class ReportController{
       if(subjectType==='analysis'){
         const subject=await c.query(`select id,base_date,status,input_snapshot from analysis.run where id=$1::uuid and tenant_id=$2`,[subjectId,s.organizationId]);
         if(!subject.rowCount)throw new HttpException('analysis_not_found',404);
-        if(!['COMPLETED','PARTIAL','CALCULATED','REQUIRES_REVIEW'].includes(String(subject.rows[0].status).toUpperCase()))throw new HttpException('analysis_not_reportable',409);
+        const analysisStatus=String(subject.rows[0].status||'').toUpperCase();
+        if(!TERMINAL_ANALYSIS_STATUSES.has(analysisStatus))throw new HttpException('analysis_not_reportable',409);
         baseDate=baseDate||String(subject.rows[0].base_date);
         inputSnapshot={analysisRunId:subjectId,analysisStatus:subject.rows[0].status,analysisInputSnapshot:subject.rows[0].input_snapshot||{}};
       }else{

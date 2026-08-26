@@ -11,7 +11,7 @@ requested_status = sys.argv[2] if len(sys.argv) > 2 else 'UNKNOWN'
 profile = sys.argv[3] if len(sys.argv) > 3 else 'ci'
 
 required_gates = [
-    'production_parity','staging_parity','immutable_release','rollback_contract',
+    'production_parity','staging_parity','immutable_release','rollback_contract','signature_contract',
     'compose_model','build_images','security_trivy','stack_health','runtime_smoke','aitec_runtime',
     'rls_isolation','privacy_lgpd','municipality_factory','ai_retrieval','ai_redteam_runtime',
     'critical_fixture_seed','browser_critical','security_baseline','load_profile',
@@ -24,7 +24,7 @@ external_gates = [
     {'gate':'live_canary_rollback','status':'NOT_HOMOLOGATED','reason':'repository contains executable canary/rollback contracts, but live execution is environment evidence'},
     {'gate':'production_ha_dr','status':'NOT_HOMOLOGATED','reason':'local DR evidence is synthetic; production RPO/RTO and PITR/failover require the final environment'},
     {'gate':'provider_specific_ai_redteam','status':'NOT_HOMOLOGATED','reason':'local deterministic prompt-injection/tenant/tool tests run with providerConfigured=false; configured providers require separate authorized adversarial evaluation'},
-    {'gate':'release_image_signature_provenance','status':'NOT_HOMOLOGATED','reason':'local Trivy CVE/misconfiguration/secret scanning is automated, but registry image signatures, build provenance and release attestations require the final registry/pipeline'},
+    {'gate':'release_image_signature_provenance','status':'NOT_HOMOLOGATED','reason':'fail-closed Cosign v3.1.3 signature + SLSA provenance verification is implemented, but the final registry digests must be actually signed/attested and verified during staging/production promotion'},
     {'gate':'official_sources_and_providers','status':'NOT_HOMOLOGATED','reason':'live credentials, licenses, municipal/official datasets and provider evidence remain external'},
     {'gate':'professional_institutional_review','status':'NOT_HOMOLOGATED','reason':'legal/architecture/engineering/fiscal/institutional approvals cannot be synthesized by local automation'},
     {'gate':'main_branch_protection','status':'NOT_HOMOLOGATED','reason':'requires repository administration/ruleset configuration outside this qualification run'},
@@ -73,6 +73,7 @@ checks.append(file_check('production_parity',artifact/'production-parity.json',l
 checks.append(file_check('staging_parity',artifact/'staging-parity.json',lambda v,p:(isinstance(v,dict) and v.get('status')=='PASS' and v.get('classification')=='STRUCTURAL_STAGING_PARITY_CONTRACT_NOT_DEPLOYED_STAGING_EVIDENCE',f"classification={v.get('classification') if isinstance(v,dict) else None}")))
 checks.append(file_check('immutable_release',artifact/'immutable-release.json',lambda v,p:(isinstance(v,dict) and v.get('status')=='PASS' and int(v.get('promotedServices',0))>=20,f"promotedServices={v.get('promotedServices') if isinstance(v,dict) else None}")))
 checks.append(file_check('rollback_contract',artifact/'rollback-contract.txt',lambda v,p:(bool(p.read_text(encoding='utf-8',errors='replace').strip()),'rollback self-test output present')))
+checks.append(file_check('signature_provenance_contract',artifact/'signature-contract.txt',lambda v,p:('signature/provenance contract self-test PASS' in p.read_text(encoding='utf-8',errors='replace'),'Cosign signature + SLSA provenance fail-closed contract present')))
 checks.append(file_check('platform_migrations',artifact/'platform-migrations.txt',lambda v,p:(bool(p.read_text().strip()),'non-empty migration ledger')))
 checks.append(file_check('control_migrations',artifact/'control-migrations.txt',lambda v,p:(bool(p.read_text().strip()),'non-empty migration ledger')))
 checks.append(file_check('playwright_results',artifact/'browser'/'playwright-results.json',lambda v,p:(isinstance(v,dict) and int((v.get('stats') or {}).get('unexpected',0))==0 and int((v.get('stats') or {}).get('expected',0))>0,f"stats={(v or {}).get('stats') if isinstance(v,dict) else None}")))

@@ -32,6 +32,7 @@ jobs:
           python tests/validate_v20_municipality_factory.py
           python tests/validate_v20_privacy.py
           python tests/test_v20_dr_contract.py
+          python tests/test_v20_cortex_qualification.py
           node tests/test_v20_ai_runtime.js
           node tests/test_v20_ai_retrieval_context.js
           node tests/test_v20_ai_provenance_ids.js

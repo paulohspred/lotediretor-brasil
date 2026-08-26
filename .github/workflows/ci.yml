@@ -44,8 +44,10 @@ jobs:
         run: npm run typecheck
       - name: Build
         run: npm run build
-      - name: Validate development compose
-        run: docker compose -f docker-compose.yml config >/dev/null
+      - name: Validate default development compose
+        run: |
+          docker compose config >/dev/null
+          docker compose config --services | grep -qx 'aitec-worker'
       - name: Validate full observability compose
         run: |
           docker compose -f docker-compose.yml -f docker-compose.ci.yml -f docker-compose.ops.yml --profile full --profile ops config >/dev/null

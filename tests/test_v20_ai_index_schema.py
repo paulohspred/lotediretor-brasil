@@ -45,7 +45,14 @@ worker = (root / 'workers/ai-ingest/main.py').read_text()
 for required in [
     'opensearch_embedding_dimension_mismatch', 'opensearch_embedding_fingerprint_mismatch',
     'embedding_revision', 'embedding_fingerprint', 'embedding_dimension', 'rebuild_required',
+    'refresh=wait_for',
 ]:
     assert required in worker, required
 
-print('v20 AI evidence index schema/version/rebuild contracts OK')
+# indexed_at is consumed by runtime callers as a search-readiness signal. The
+# OpenSearch write therefore has to wait for refresh before the DB flag is set.
+refresh_write = worker.index('refresh=wait_for')
+indexed_ready = worker.index('update ingest.document_text set indexed_at=now()')
+assert refresh_write < indexed_ready
+
+print('v20 AI evidence index schema/version/rebuild/search-readiness contracts OK')

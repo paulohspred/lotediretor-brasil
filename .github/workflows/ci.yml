@@ -33,6 +33,7 @@ jobs:
           python tests/validate_v20_privacy.py
           python tests/test_v20_dr_contract.py
           python tests/test_v20_cortex_qualification.py
+          python tests/test_v20_supply_chain.py
           node tests/test_v20_ai_runtime.js
           node tests/test_v20_ai_retrieval_context.js
           node tests/test_v20_ai_provenance_ids.js
@@ -53,6 +54,13 @@ jobs:
         run: docker run --rm --entrypoint /bin/promtool -v "$PWD/infra/prometheus:/etc/prometheus:ro" prom/prometheus:v3.5.0 check config /etc/prometheus/prometheus.yml
       - name: Validate rendered production parity
         run: python3 ops/security/production-parity.py
+      - name: Generate and validate supply-chain inventory and CycloneDX SBOM
+        env:
+          SECURITY_ARTIFACT_DIR: /tmp/lotediretor-supply-chain
+        run: |
+          python3 ops/security/supply-chain.py
+          test -s /tmp/lotediretor-supply-chain/supply-chain.json
+          test -s /tmp/lotediretor-supply-chain/sbom.cdx.json
       - name: Validate immutable staging candidate equivalence
         run: python3 ops/staging/production-equivalence.py
       - name: Validate immutable release promotion model

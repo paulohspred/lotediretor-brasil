@@ -1,0 +1,28 @@
+name: homologation-contract
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  production-homologation-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Validate production homologation evidence contract
+        run: python tests/test_v20_production_homologation_contract.py
+      - name: Validate homologation gate self-test
+        run: python3 ops/release/production-homologation.py --self-test
+      - name: Verify example evidence remains non-homologated
+        run: |
+          python3 - <<'PY'
+          import json
+          p='docs/ops/PRODUCTION_HOMOLOGATION_EVIDENCE.example.json'
+          d=json.load(open(p,encoding='utf-8'))
+          assert d['productionHomologated'] is False
+          assert all(v['status']=='PENDING' for v in d['gates'].values())
+          print('production homologation template remains fail-closed')
+          PY

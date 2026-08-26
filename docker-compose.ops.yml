@@ -5,6 +5,9 @@ services:
   control-api:
     environment:
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+  ai-gateway:
+    environment:
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
   solar-engine:
     environment:
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
@@ -24,6 +27,9 @@ services:
       AITEC_JOB_TIMEOUT_SECONDS: ${AITEC_JOB_TIMEOUT_SECONDS:-180}
       AITEC_JOB_MAX_ATTEMPTS: ${AITEC_JOB_MAX_ATTEMPTS:-3}
       AITEC_JOB_STALE_SECONDS: ${AITEC_JOB_STALE_SECONDS:-600}
+      AITEC_JOB_RETRY_BASE_SECONDS: ${AITEC_JOB_RETRY_BASE_SECONDS:-5}
+      AITEC_JOB_RETRY_MAX_SECONDS: ${AITEC_JOB_RETRY_MAX_SECONDS:-60}
+      AITEC_METRICS_PORT: ${AITEC_METRICS_PORT:-9104}
     depends_on:
       platform-db:
         condition: service_healthy

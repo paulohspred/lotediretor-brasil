@@ -1,3 +1,5 @@
-# A.I TEC compute — v14
+# A.I TEC compute — v20
 
-O compute atual está isolado no `services/aitec-engine`: envelope métrico, estacionamento preliminar, massing, programa de unidades e ranking de cenários. A Platform API persiste constraints, métricas e artefatos GeoJSON. Solvers CAD/BIM/GPU completos permanecem posteriores.
+O compute avançado permanece isolado em `services/aitec-engine`, enquanto a Platform API controla autorização, tenant, projeto e idempotência. `workers/aitec` executa a fila durável `aitec.job` de forma assíncrona com `FOR UPDATE SKIP LOCKED`, retry limitado e recuperação de jobs abandonados.
+
+O worker chama somente o contrato interno `/aitec/v20/execute/{operation}` e valida que `tenant_id`, `project_id` e `constraint_snapshot_id` devolvidos pelo engine correspondem ao contexto persistido. Resultados continuam classificados como estudo/pré-projeto; a fila não converte solver técnico em projeto executivo ou homologação profissional.

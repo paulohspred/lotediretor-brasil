@@ -6,6 +6,13 @@ ARTIFACT_DIR="${SECURITY_ARTIFACT_DIR:-runtime-artifacts/security}"
 mkdir -p "$ARTIFACT_DIR"
 : "${INTERNAL_API_TOKEN:?INTERNAL_API_TOKEN is required}"
 
+# Supply-chain inventory is part of the local security baseline. It validates
+# the rendered production/release model and emits CycloneDX evidence, but is
+# intentionally not described as a vulnerability scan or pentest.
+SECURITY_ARTIFACT_DIR="$ARTIFACT_DIR" python3 ./ops/security/supply-chain.py > "$ARTIFACT_DIR/supply-chain.stdout.json"
+test -s "$ARTIFACT_DIR/supply-chain.json"
+test -s "$ARTIFACT_DIR/sbom.cdx.json"
+
 request_code(){
   local method="$1" url="$2";shift 2
   curl -sS --max-time 15 -o "$ARTIFACT_DIR/body.tmp" -w '%{http_code}' -X "$method" "$@" "$url" || true
@@ -76,7 +83,7 @@ if [[ "$code" =~ ^2 ]]; then echo "TRACE unexpectedly accepted with HTTP $code" 
 
 python3 - "$ARTIFACT_DIR/result.json" <<'PY'
 import json,sys,datetime
-json.dump({'status':'PASS','timestampUtc':datetime.datetime.now(datetime.timezone.utc).isoformat(),'checks':['security_headers','oidc_cookie_flags','open_redirect_sanitization','fake_session_rejected','privacy_unauth_rejected','ai_internal_token_boundary','cors_not_permissive','trace_not_accepted']},open(sys.argv[1],'w'),indent=2)
+json.dump({'status':'PASS','timestampUtc':datetime.datetime.now(datetime.timezone.utc).isoformat(),'checks':['supply_chain_inventory','security_headers','oidc_cookie_flags','open_redirect_sanitization','fake_session_rejected','privacy_unauth_rejected','ai_internal_token_boundary','cors_not_permissive','trace_not_accepted']},open(sys.argv[1],'w'),indent=2)
 PY
 cat "$ARTIFACT_DIR/result.json"
 echo 'Runtime security baseline PASS'

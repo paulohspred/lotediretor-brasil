@@ -26,6 +26,7 @@ checks={
   'alertmanager':'http://alertmanager:9093/-/ready',
   'otel-collector':'http://otel-collector:13133/',
   'blackbox-exporter':'http://blackbox-exporter:9115/-/healthy',
+  'ai-gateway-metrics':'http://ai-gateway:3003/metrics',
   'aitec-worker-metrics':'http://aitec-worker:9104/metrics',
 }
 
@@ -60,7 +61,7 @@ if pending:
 
 targets=json.loads(get('http://prometheus:9090/api/v1/targets'))
 active=targets.get('data',{}).get('activeTargets',[])
-required={'platform-api','control-api','solar-engine','aitec-engine','aitec-worker','blackbox-http'}
+required={'platform-api','control-api','ai-gateway','solar-engine','aitec-engine','aitec-worker','blackbox-http'}
 by_pool={}
 for target in active:
     pool=target.get('scrapePool')
@@ -91,6 +92,13 @@ for target in probe_targets:
     value=float(values[0]['value'][1]) if values else 0.0
     probe_results[target]=value
     if value!=1.0:raise RuntimeError('blackbox_probe_failed:'+target)
+
+ai_requests=prom_query('sum(lotediretor_http_requests_total{service="ai-gateway"})')
+if not ai_requests or float(ai_requests[0]['value'][1])<=0:
+    raise RuntimeError('ai_gateway_red_metrics_missing_or_empty')
+ai_latency=prom_query('sum(lotediretor_http_request_duration_seconds_count{service="ai-gateway"})')
+if not ai_latency or float(ai_latency[0]['value'][1])<=0:
+    raise RuntimeError('ai_gateway_latency_histogram_missing_or_empty')
 
 worker_ready=prom_query('lotediretor_aitec_worker_ready')
 if not worker_ready or float(worker_ready[0]['value'][1])!=1.0:
@@ -131,6 +139,10 @@ print(json.dumps({
   'components':results,
   'prometheusTargets':by_pool,
   'blackboxProbes':probe_results,
+  'aiGateway':{
+    'redRequests':float(ai_requests[0]['value'][1]),
+    'latencyHistogramCount':float(ai_latency[0]['value'][1]),
+  },
   'aitecWorker':{
     'ready':True,
     'lastDbSuccessUnix':last_db_value,

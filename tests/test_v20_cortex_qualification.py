@@ -4,6 +4,7 @@ root=Path(__file__).resolve().parents[1]
 harness=(root/'ops/cortex/qualify-local.sh').read_text()
 report=(root/'ops/cortex/qualification-report.py').read_text()
 manifest=(root/'ops/cortex/evidence-manifest.py').read_text()
+security=(root/'ops/security/runtime-baseline.sh').read_text()
 
 required=[
  'production_parity','staging_parity','immutable_release','rollback_contract',
@@ -17,21 +18,19 @@ for gate in required:
     assert repr(gate) in report or f"'{gate}'" in report, f'report does not require gate {gate}'
 
 for needle in [
- 'qualification-report.py',
- 'evidence-manifest.py',
- 'gate-status.tsv',
- 'production-parity.json',
- 'staging-parity.json',
- 'immutable-release.json',
- 'rollback-contract.txt',
- 'Final qualification report rejected a nominal PASS',
- 'full qualification will be rejected',
+ 'qualification-report.py','evidence-manifest.py','gate-status.tsv',
+ 'production-parity.json','staging-parity.json','immutable-release.json','rollback-contract.txt',
+ 'Final qualification report rejected a nominal PASS','full qualification will be rejected',
 ]:
     assert needle in harness, f'harness missing final-report contract: {needle}'
 
+for needle in ['ops/security/supply-chain.py','supply-chain.json','sbom.cdx.json','supply_chain_inventory']:
+    assert needle in security, f'security baseline missing supply-chain evidence: {needle}'
+
 for needle in [
  'production_parity','staging_parity','immutable_release','rollback_contract',
- 'playwright-results.json','k6-summary.json','security_baseline','observability_gate',
+ 'playwright-results.json','k6-summary.json','security_baseline','supply_chain_inventory','cyclonedx_sbom','observability_gate',
+ 'LOCAL_SUPPLY_CHAIN_INVENTORY_NOT_VULNERABILITY_SCAN','vulnerability_image_signature_scan',
  'dr_evidence','opensearch_health','ld-ai-b-leak.json',
  "'productionHomologated':False",
  'STRUCTURAL_STAGING_PARITY_CONTRACT_NOT_DEPLOYED_STAGING_EVIDENCE',
@@ -42,4 +41,4 @@ for needle in [
     assert needle in report, f'qualification report missing evidence/final gate: {needle}'
 
 assert 'productionHomologated remains false' in manifest
-print('v20 Cortex local + release/staging gate ledger + final evidence report contract OK')
+print('v20 Cortex local + release/staging/supply-chain evidence report contract OK')

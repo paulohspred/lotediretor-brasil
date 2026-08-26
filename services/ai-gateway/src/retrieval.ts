@@ -17,7 +17,7 @@ function index(){return String(process.env.OPENSEARCH_EVIDENCE_INDEX||'lotediret
 function headers(){const h:any={'content-type':'application/json'};const u=process.env.OPENSEARCH_USERNAME||'',p=process.env.OPENSEARCH_PASSWORD||'';if(u||p)h.authorization=`Basic ${Buffer.from(`${u}:${p}`).toString('base64')}`;return h;}
 export function retrievalConfigured(){return Boolean(osBase());}
 
-function normalizedStrings(values:any){return [...new Set((Array.isArray(values)?values:[]).map(String).map(x=>x.trim()).filter(Boolean))].sort();}
+function normalizedStrings(values:any){return [...new Set((Array.isArray(values)?values:[]).filter((x:any)=>x!==null&&x!==undefined).map(String).map(x=>x.trim()).filter(Boolean))].sort();}
 
 function filterClauses(tenantId:string,scope:RetrievalScope){
   const f:any[]=[{term:{retrieval_allowed:true}}];

@@ -36,10 +36,12 @@ except Exception as exc: raise SystemExit(f'production compose JSON invalid: {ex
 services=model.get('services') or {}
 errors=[]
 
+
 def svc(name):
     x=services.get(name)
     if not isinstance(x,dict): errors.append(f'missing service:{name}');return {}
     return x
+
 
 def envmap(name):
     e=svc(name).get('environment') or {}
@@ -50,12 +52,24 @@ def envmap(name):
         return out
     return {str(k):'' if v is None else str(v) for k,v in e.items()}
 
+
 def port_targets(name):
     out=[]
     for p in svc(name).get('ports') or []:
         if isinstance(p,dict): out.append((str(p.get('target')),str(p.get('published')),str(p.get('host_ip') or '')))
         else: out.append((str(p),str(p),''))
     return out
+
+
+def positive_number(value, label):
+    try:
+        n=float(value)
+    except (TypeError,ValueError):
+        errors.append(f'{label} is not numeric:{value}')
+        return None
+    if n <= 0: errors.append(f'{label} must be > 0:{value}')
+    return n
+
 
 for name in services:
     ports=port_targets(name)
@@ -66,11 +80,12 @@ for name in services:
         errors.append(f'internal service publishes host port:{name}:{ports}')
 
 platform=envmap('platform-api');control=envmap('control-api');ai=envmap('ai-gateway')
+solar=envmap('solar-engine');aitec=envmap('aitec-engine');aitec_worker=envmap('aitec-worker')
 if platform.get('NODE_ENV')!='production': errors.append('platform-api NODE_ENV not production')
 if control.get('NODE_ENV')!='production': errors.append('control-api NODE_ENV not production')
 if ai.get('NODE_ENV')!='production': errors.append('ai-gateway NODE_ENV not production')
-if envmap('solar-engine').get('APP_ENV')!='production': errors.append('solar-engine APP_ENV not production')
-if envmap('aitec-engine').get('APP_ENV')!='production': errors.append('aitec-engine APP_ENV not production')
+if solar.get('APP_ENV')!='production': errors.append('solar-engine APP_ENV not production')
+if aitec.get('APP_ENV')!='production': errors.append('aitec-engine APP_ENV not production')
 if platform.get('SESSION_COOKIE_SECURE')!='true': errors.append('platform secure cookie disabled')
 if platform.get('ALLOW_LOCAL_AUTO_MEMBERSHIP')!='false': errors.append('platform local auto-membership enabled')
 if platform.get('RUN_MIGRATIONS_ON_START')!='false': errors.append('platform runtime migrations enabled')
@@ -79,6 +94,15 @@ if platform.get('PLATFORM_MIGRATION_DATABASE_URL','')!='': errors.append('platfo
 if control.get('CONTROL_MIGRATION_DATABASE_URL','')!='': errors.append('control-api carries migration-owner DSN')
 if 'ld_platform_app:' not in platform.get('PLATFORM_DATABASE_URL',''): errors.append('platform-api does not use app DB role')
 if 'ld_control_app:' not in control.get('CONTROL_DATABASE_URL',''): errors.append('control-api does not use app DB role')
+
+otel_expected='http://otel-collector:4318'
+for name,service_env in (
+    ('platform-api',platform),('control-api',control),('ai-gateway',ai),
+    ('solar-engine',solar),('aitec-engine',aitec),
+):
+    endpoint=service_env.get('OTEL_EXPORTER_OTLP_ENDPOINT','').rstrip('/')
+    if endpoint!=otel_expected:
+        errors.append(f'{name} OTLP endpoint not production collector:{endpoint or "missing"}')
 
 if 'ld_platform_migration:' not in envmap('platform-migrate').get('PLATFORM_MIGRATION_DATABASE_URL',''): errors.append('platform-migrate missing migration role')
 if 'ld_control_migration:' not in envmap('control-migrate').get('CONTROL_MIGRATION_DATABASE_URL',''): errors.append('control-migrate missing migration role')
@@ -104,10 +128,40 @@ worker_expectations={
 for name,(key,needle) in worker_expectations.items():
     if needle not in envmap(name).get(key,''): errors.append(f'{name} does not use least-privilege role in {key}')
 
+worker=svc('aitec-worker')
+if aitec_worker.get('AITEC_METRICS_PORT')!='9104': errors.append('aitec-worker metrics port must be 9104')
+retry_base=positive_number(aitec_worker.get('AITEC_JOB_RETRY_BASE_SECONDS'),'aitec-worker retry base')
+retry_max=positive_number(aitec_worker.get('AITEC_JOB_RETRY_MAX_SECONDS'),'aitec-worker retry max')
+if retry_base is not None and retry_max is not None and retry_max < retry_base:
+    errors.append('aitec-worker retry max is lower than retry base')
+if worker.get('restart') not in ('unless-stopped','always'):
+    errors.append(f'aitec-worker restart policy not resilient:{worker.get("restart") or "missing"}')
+depends=worker.get('depends_on') or {}
+aitec_dep=depends.get('aitec-engine') if isinstance(depends,dict) else None
+condition=aitec_dep.get('condition') if isinstance(aitec_dep,dict) else None
+if condition!='service_healthy': errors.append(f'aitec-worker does not wait for healthy aitec-engine:{condition}')
+healthcheck=worker.get('healthcheck') or {}
+health_text=json.dumps(healthcheck,sort_keys=True)
+if '9104/metrics' not in health_text: errors.append('aitec-worker healthcheck does not probe metrics endpoint')
+
 serialized=json.dumps(model,sort_keys=True)
 for marker in ['change-me','lotediretor_local','local-lotediretor-secret','local-internal-change-me']:
     if marker in serialized: errors.append(f'development marker leaked into production model:{marker}')
 
-report={'status':'PASS' if not errors else 'FAIL','services':len(services),'publishedPorts':{n:port_targets(n) for n in services if port_targets(n)},'errors':errors}
+report={
+    'status':'PASS' if not errors else 'FAIL',
+    'services':len(services),
+    'publishedPorts':{n:port_targets(n) for n in services if port_targets(n)},
+    'telemetry':{name:envmap(name).get('OTEL_EXPORTER_OTLP_ENDPOINT') for name in ('platform-api','control-api','ai-gateway','solar-engine','aitec-engine')},
+    'aitecWorker':{
+        'databaseRoleOk':'lotediretor_worker:' in aitec_worker.get('PLATFORM_DATABASE_URL',''),
+        'metricsPort':aitec_worker.get('AITEC_METRICS_PORT'),
+        'retryBaseSeconds':aitec_worker.get('AITEC_JOB_RETRY_BASE_SECONDS'),
+        'retryMaxSeconds':aitec_worker.get('AITEC_JOB_RETRY_MAX_SECONDS'),
+        'restart':worker.get('restart'),
+        'engineDependencyCondition':condition,
+    },
+    'errors':errors,
+}
 print(json.dumps(report,indent=2,ensure_ascii=False))
 if errors: raise SystemExit(1)

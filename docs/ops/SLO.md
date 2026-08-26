@@ -4,7 +4,7 @@ Status: **candidatos operacionais para validação no Cortex/staging**. Estes va
 
 ## Escopo
 
-Os SLIs abaixo cobrem `platform-api`, `control-api`, `solar-engine` e `aitec-engine` por métricas RED de baixa cardinalidade. O AI Gateway possui gates próprios de evidência/abstenção e deve ser incluído no plano de métricas HTTP antes da homologação final. Fontes externas, providers de IA e revisões profissionais possuem gates independentes.
+Os SLIs HTTP abaixo cobrem `platform-api`, `control-api`, `ai-gateway`, `solar-engine` e `aitec-engine` por métricas RED de baixa cardinalidade. A fila assíncrona A.I TEC possui SLIs próprios de profundidade, idade, retry e falha terminal. Fontes externas, providers de IA, revisões profissionais e qualidade/grounding possuem gates independentes e não podem ser reduzidos a disponibilidade HTTP.
 
 ## Disponibilidade HTTP
 
@@ -22,30 +22,59 @@ Os SLIs abaixo cobrem `platform-api`, `control-api`, `solar-engine` e `aitec-eng
 
 O gate local/CI é mais curto e usa taxa de falha k6 inferior a 1%; ele detecta regressões, mas não substitui a medição mensal.
 
-## Latência
+## Latência HTTP
 
 **SLI:** histograma `lotediretor_http_request_duration_seconds` por serviço. A cardinalidade é limitada a `service`, `method` e `status_class`; paths, tenant IDs e IDs de recurso não são labels.
 
 **Objetivo candidato para tráfego interativo:** p95 <= 1,5 s em janela de 5 minutos. O alerta `LoteDiretorHighP95Latency` dispara após 10 minutos acima desse limiar. Operações assíncronas de geração, exportação, visão, ingestão ou IA não devem ser transformadas artificialmente em endpoints síncronos para satisfazer esse alvo.
 
-## Taxa de erro
+O AI Gateway participa do mesmo RED HTTP, mas sua aceitação funcional continua exigindo separadamente retrieval tenant/public/temporal, grounding, abstenção e high-risk fail-closed. Uma resposta rápida incorreta não satisfaz o produto.
 
-Os recording rules são:
+## A.I TEC — fila assíncrona
+
+A execução A.I TEC persistida é medida separadamente do request HTTP que apenas enfileira o trabalho.
+
+**SLIs disponíveis:**
+
+- profundidade por estado: `lotediretor_aitec_jobs{status}`;
+- idade do job mais antigo por estado: `lotediretor_aitec_oldest_job_age_seconds{status}`;
+- outcomes do worker: `lotediretor_aitec_job_executions_total{result}` com `completed`, `retry` e `failed`;
+- stale reclaim: `lotediretor_aitec_job_stale_reclaims_total{result}`;
+- duração da chamada ao solver: `lotediretor_aitec_engine_duration_seconds`;
+- último ciclo DB bem-sucedido: `lotediretor_aitec_worker_last_db_success_unixtime`.
+
+**Objetivos candidatos de pré-produção:**
+
+- nenhum job `QUEUED` deve permanecer com idade > 120 s por mais de 5 minutos em carga nominal;
+- idade > 600 s é condição crítica de fila travada;
+- `aitec-worker` e seu ciclo DB não podem ficar invisíveis/stale por mais de 2 minutos;
+- falha terminal deve permanecer excepcional e sempre gerar `aitec.job.failed`; retry não é contabilizado como sucesso nem usado para esconder indisponibilidade;
+- retries transitórios usam backoff persistente, não hot-loop, e a recuperação deve concluir o mesmo `job_id` sem evento de conclusão duplicado.
+
+Esses limiares são candidatos de engenharia. O profile `capacity`/soak em staging production-like deve medir vazão e tempo de fila antes de qualquer SLO final de jobs ser aprovado.
+
+## Taxa de erro e alertas
+
+Os recording rules HTTP são:
 
 - `lotediretor:http_requests:rate5m`;
 - `lotediretor:http_5xx:ratio5m`;
 - `lotediretor:http_latency:p95_5m`.
 
-Alertas candidatos:
+Alertas candidatos HTTP:
 
 - warning quando 5xx > 1% por 5 minutos;
 - critical quando 5xx > 5% por 2 minutos;
 - warning quando p95 > 1,5 s por 10 minutos;
 - critical quando um serviço/DB ou target Prometheus fica indisponível por 2 minutos.
 
+Alertas candidatos A.I TEC incluem worker/DB stale, backlog, fila stalled/crítica, falha terminal e retry storm. Os thresholds operacionais estão versionados em `infra/prometheus/rules/lotediretor.yml` e o procedimento em `docs/ops/RUNBOOKS.md`.
+
 ## Segurança e IA
 
 Disponibilidade não pode sobrepor segurança. Respostas 401/403 legítimas não são erro de disponibilidade. Um AI Gateway que se abstém por falta de evidência/provider é preferível a uma resposta inventada; qualidade, grounding, ACL/tenant, bitemporalidade e high-risk gates permanecem critérios separados de SLO HTTP.
+
+Métricas HTTP não carregam tenant, project, job, document ou resource IDs como labels. Identificadores necessários para investigação permanecem em traces/logs/evidência persistida, evitando cardinalidade explosiva e exposição acidental no plano de métricas.
 
 ## Dados e recuperação
 

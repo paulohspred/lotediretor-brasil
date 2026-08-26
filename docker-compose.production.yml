@@ -122,6 +122,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 12
+    restart: unless-stopped
   gateway:
     ports: !override
     - 80:80

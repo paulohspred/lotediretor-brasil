@@ -6,6 +6,7 @@ report=(root/'ops/cortex/qualification-report.py').read_text()
 manifest=(root/'ops/cortex/evidence-manifest.py').read_text()
 
 required=[
+ 'production_parity','staging_parity','immutable_release','rollback_contract',
  'compose_model','build_images','stack_health','runtime_smoke','aitec_runtime',
  'rls_isolation','privacy_lgpd','municipality_factory','ai_retrieval',
  'critical_fixture_seed','browser_critical','security_baseline','load_profile',
@@ -19,15 +20,21 @@ for needle in [
  'qualification-report.py',
  'evidence-manifest.py',
  'gate-status.tsv',
+ 'production-parity.json',
+ 'staging-parity.json',
+ 'immutable-release.json',
+ 'rollback-contract.txt',
  'Final qualification report rejected a nominal PASS',
  'full qualification will be rejected',
 ]:
     assert needle in harness, f'harness missing final-report contract: {needle}'
 
 for needle in [
+ 'production_parity','staging_parity','immutable_release','rollback_contract',
  'playwright-results.json','k6-summary.json','security_baseline','observability_gate',
  'dr_evidence','opensearch_health','ld-ai-b-leak.json',
  "'productionHomologated':False",
+ 'STRUCTURAL_STAGING_PARITY_CONTRACT_NOT_DEPLOYED_STAGING_EVIDENCE',
  'independent_pentest','production_like_staging','live_canary_rollback','production_ha_dr',
  'official_sources_and_providers','professional_institutional_review','main_branch_protection',
  'NOT_HOMOLOGATED',
@@ -35,4 +42,4 @@ for needle in [
     assert needle in report, f'qualification report missing evidence/final gate: {needle}'
 
 assert 'productionHomologated remains false' in manifest
-print('v20 Cortex local gate ledger + final evidence report contract OK')
+print('v20 Cortex local + release/staging gate ledger + final evidence report contract OK')

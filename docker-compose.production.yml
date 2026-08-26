@@ -49,7 +49,10 @@ services:
     environment:
       NODE_ENV: production
       PLATFORM_DATABASE_URL: postgresql://${PLATFORM_DB_APP_USER:-lotediretor_app}:${PLATFORM_DB_APP_PASSWORD:?required}@platform-db:5432/${PLATFORM_DB_NAME:?required}
-      PLATFORM_MIGRATION_DATABASE_URL: postgresql://${PLATFORM_DB_MIGRATION_USER:?required}:${PLATFORM_DB_MIGRATION_PASSWORD:?required}@platform-db:5432/${PLATFORM_DB_NAME:?required}
+      # Runtime API never receives the migration-owner DSN. The dedicated
+      # platform-migrate one-shot service is the only application container
+      # allowed to hold it in production.
+      PLATFORM_MIGRATION_DATABASE_URL: ''
       SESSION_COOKIE_SECURE: 'true'
       ALLOW_LOCAL_AUTO_MEMBERSHIP: 'false'
       INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN:?required}
@@ -63,7 +66,9 @@ services:
     environment:
       NODE_ENV: production
       CONTROL_DATABASE_URL: postgresql://${CONTROL_DB_APP_USER:-lotediretor_control_app}:${CONTROL_DB_APP_PASSWORD:?required}@control-db:5432/${CONTROL_DB_NAME:?required}
-      CONTROL_MIGRATION_DATABASE_URL: postgresql://${CONTROL_DB_MIGRATION_USER:?required}:${CONTROL_DB_MIGRATION_PASSWORD:?required}@control-db:5432/${CONTROL_DB_NAME:?required}
+      # Same least-privilege rule as platform-api: migrations run only in the
+      # dedicated control-migrate service.
+      CONTROL_MIGRATION_DATABASE_URL: ''
       INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN:?required}
       MERCADOPAGO_WEBHOOK_SECRET: ${MERCADOPAGO_WEBHOOK_SECRET:-}
       RUN_MIGRATIONS_ON_START: 'false'

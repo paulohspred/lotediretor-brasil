@@ -6,10 +6,10 @@ ARTIFACT_DIR="${OBSERVABILITY_ARTIFACT_DIR:-$ROOT_DIR/runtime-artifacts/observab
 mkdir -p "$ARTIFACT_DIR"
 OUT="$ARTIFACT_DIR/observability-gate.json"
 
-for service in prometheus grafana loki tempo promtail alertmanager otel-collector blackbox-exporter; do
+for service in prometheus grafana loki tempo promtail alertmanager otel-collector blackbox-exporter aitec-worker; do
   if ! docker compose ps --status running --services | grep -qx "$service"; then
-    echo "observability service not running: $service" >&2
-    echo "Start Compose with COMPOSE_PROFILES=full,ops and docker-compose.ops.yml" >&2
+    echo "required observability/runtime service not running: $service" >&2
+    echo "Start Compose with COMPOSE_PROFILES=full,ops and docker-compose.ci.yml + docker-compose.ops.yml" >&2
     exit 1
   fi
 done
@@ -26,6 +26,7 @@ checks={
   'alertmanager':'http://alertmanager:9093/-/ready',
   'otel-collector':'http://otel-collector:13133/',
   'blackbox-exporter':'http://blackbox-exporter:9115/-/healthy',
+  'aitec-worker-metrics':'http://aitec-worker:9104/metrics',
 }
 
 def get(url,timeout=5):
@@ -35,6 +36,12 @@ def get(url,timeout=5):
         if not (200 <= r.status < 300):
             raise RuntimeError(f'{url}:HTTP {r.status}')
         return body
+
+def prom_query(expr):
+    query=urllib.parse.urlencode({'query':expr})
+    raw=json.loads(get('http://prometheus:9090/api/v1/query?'+query))
+    if raw.get('status')!='success':raise RuntimeError('prometheus_query_failed:'+expr)
+    return raw.get('data',{}).get('result',[])
 
 results={}
 deadline=time.time()+120
@@ -53,7 +60,7 @@ if pending:
 
 targets=json.loads(get('http://prometheus:9090/api/v1/targets'))
 active=targets.get('data',{}).get('activeTargets',[])
-required={'platform-api','control-api','solar-engine','aitec-engine','blackbox-http'}
+required={'platform-api','control-api','solar-engine','aitec-engine','aitec-worker','blackbox-http'}
 by_pool={}
 for target in active:
     pool=target.get('scrapePool')
@@ -80,12 +87,29 @@ probe_targets=[
 ]
 probe_results={}
 for target in probe_targets:
-    query=urllib.parse.urlencode({'query':f'probe_success{{instance="{target}"}}'})
-    raw=json.loads(get('http://prometheus:9090/api/v1/query?'+query))
-    values=raw.get('data',{}).get('result',[])
+    values=prom_query(f'probe_success{{instance="{target}"}}')
     value=float(values[0]['value'][1]) if values else 0.0
     probe_results[target]=value
     if value!=1.0:raise RuntimeError('blackbox_probe_failed:'+target)
+
+worker_ready=prom_query('lotediretor_aitec_worker_ready')
+if not worker_ready or float(worker_ready[0]['value'][1])!=1.0:
+    raise RuntimeError('aitec_worker_not_ready')
+last_db=prom_query('lotediretor_aitec_worker_last_db_success_unixtime')
+if not last_db:raise RuntimeError('aitec_worker_last_db_success_missing')
+last_db_value=float(last_db[0]['value'][1])
+last_db_age=max(0.0,time.time()-last_db_value)
+if last_db_age>60:raise RuntimeError(f'aitec_worker_db_cycle_stale:{last_db_age:.1f}s')
+
+queue_series=prom_query('lotediretor_aitec_jobs')
+queue_by_status={item.get('metric',{}).get('status'):float(item['value'][1]) for item in queue_series}
+required_states={'QUEUED','RUNNING','COMPLETED','FAILED','CANCELLED'}
+missing_states=sorted(required_states-set(queue_by_status))
+if missing_states:raise RuntimeError('aitec_queue_metrics_missing_states:'+','.join(missing_states))
+oldest_series=prom_query('lotediretor_aitec_oldest_job_age_seconds')
+oldest_by_status={item.get('metric',{}).get('status'):float(item['value'][1]) for item in oldest_series}
+if not required_states.issubset(oldest_by_status):
+    raise RuntimeError('aitec_queue_age_metrics_incomplete')
 
 rules=json.loads(get('http://prometheus:9090/api/v1/rules'))
 rule_names=[]
@@ -94,7 +118,10 @@ for group in rules.get('data',{}).get('groups',[]):
         if rule.get('name'):rule_names.append(rule['name'])
 required_rules={
   'LoteDiretorServiceDown','LoteDiretorTargetMissing','LoteDiretorEdgeProbeDown',
-  'LoteDiretorHigh5xxRate','LoteDiretorCritical5xxRate','LoteDiretorHighP95Latency'
+  'LoteDiretorHigh5xxRate','LoteDiretorCritical5xxRate','LoteDiretorHighP95Latency',
+  'LoteDiretorAitecWorkerDown','LoteDiretorAitecWorkerDbStale','LoteDiretorAitecQueueBacklog',
+  'LoteDiretorAitecQueueStalled','LoteDiretorAitecQueueCriticallyStalled',
+  'LoteDiretorAitecJobFailures','LoteDiretorAitecRetryStorm'
 }
 missing_rules=sorted(required_rules-set(rule_names))
 if missing_rules:raise RuntimeError('prometheus_rules_missing:'+','.join(missing_rules))
@@ -104,6 +131,13 @@ print(json.dumps({
   'components':results,
   'prometheusTargets':by_pool,
   'blackboxProbes':probe_results,
+  'aitecWorker':{
+    'ready':True,
+    'lastDbSuccessUnix':last_db_value,
+    'lastDbSuccessAgeSeconds':round(last_db_age,3),
+    'jobsByStatus':queue_by_status,
+    'oldestJobAgeSeconds':oldest_by_status,
+  },
   'alertRules':sorted(set(rule_names)),
 },sort_keys=True))
 PY

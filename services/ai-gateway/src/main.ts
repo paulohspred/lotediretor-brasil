@@ -6,9 +6,21 @@ import {prompt,promptRegistry} from './prompts.js';
 import {toolRegistry,toolAuthorized} from './tools.js';
 import {modelProvidersConfigured,modelRouterStatus,routeChat} from './model-router.js';
 import {evaluateCases} from './evals.js';
+import {beginHttpTrace,finishHttpTrace,renderHttpMetrics,traceparent} from './telemetry.js';
 
 const app=Fastify({logger:true});
 const VERSION='19.0.0-rc.3';
+
+app.addHook('onRequest',async(req:any,reply:any)=>{
+  const incoming=String(req.headers?.['x-request-id']||'').slice(0,128);
+  const requestId=incoming||String(req.id);
+  req.requestId=requestId;
+  const tr=beginHttpTrace(req);
+  reply.header('traceparent',traceparent(tr));
+  reply.header('x-request-id',requestId);
+  reply.header('x-trace-id',tr.traceId);
+});
+app.addHook('onResponse',async(req:any,reply:any)=>{finishHttpTrace('ai-gateway',VERSION,req,reply);});
 
 function internal(req:any,reply:any){
   const expected=process.env.INTERNAL_API_TOKEN||'';
@@ -153,6 +165,10 @@ function retrievalSummary(retrieval:any){
     errors:retrieval.errors||[]
   };
 }
+
+app.get('/metrics',async(_req:any,reply:any)=>{
+  return reply.type('text/plain; version=0.0.4; charset=utf-8').send(renderHttpMetrics('ai-gateway'));
+});
 
 app.get('/ai/health',async()=>({
   ok:true,

@@ -17,7 +17,7 @@ export class AuthService{
     const r=await fetch(this.internalIssuer+'/protocol/openid-connect/token',{method:'POST',headers:{'content-type':'application/x-www-form-urlencoded'},body:new URLSearchParams({grant_type:'authorization_code',client_id:this.clientId,client_secret:this.secret,code,redirect_uri:this.redirect,code_verifier:verifier})});if(!r.ok)throw new Error('OIDC token exchange failed '+r.status);const tok:any=await r.json();
     const ur=await fetch(this.internalIssuer+'/protocol/openid-connect/userinfo',{headers:{authorization:`Bearer ${tok.access_token}`}});if(!ur.ok)throw new Error('OIDC userinfo failed');const user:any=await ur.json();let keycloakRoles:string[]=[];try{const payload=JSON.parse(Buffer.from(tok.access_token.split('.')[1],'base64url').toString());keycloakRoles=payload?.realm_access?.roles||[];}catch{}
     const userId=uuidValidate(String(user.sub||''))?String(user.sub):uuidv5(String(user.sub||user.email),SUBJECT_NAMESPACE);
-    await this.pool.query(`insert into iam.user_profile(id,email,display_name) values($1,$2,$3) on conflict(id) do update set email=excluded.email,display_name=excluded.display_name`,[userId,String(user.email||`${userId}@oidc.local`),user.name||user.preferred_username||null]);
+    await this.pool.query(`insert into iam.user_profile(id,email,display_name) values($1,$2,$3) on conflict(id) do update set email=excluded.email,display_name=excluded.display_name,privacy_status='ACTIVE',anonymized_at=null`,[userId,String(user.email||`${userId}@oidc.local`),user.name||user.preferred_username||null]);
     let memberships=(await this.pool.query(`select m.organization_id,m.role,o.status from iam.membership m join iam.organization o on o.id=m.organization_id where m.user_id=$1 and o.status='ACTIVE' order by m.created_at`,[userId])).rows;
     const allowLocal=process.env.ALLOW_LOCAL_AUTO_MEMBERSHIP==='true'||process.env.NODE_ENV!=='production';
     if(!memberships.length&&allowLocal){await this.pool.query(`insert into iam.membership(organization_id,user_id,role) values($1,$2,$3) on conflict(organization_id,user_id) do update set role=excluded.role`,[LOCAL_ORG,userId,keycloakRoles.includes('admin')?'admin':'user']);memberships=[{organization_id:LOCAL_ORG,role:keycloakRoles.includes('admin')?'admin':'user',status:'ACTIVE'}];}
@@ -27,4 +27,16 @@ export class AuthService{
   }
   async get(sid?:string){if(!sid)return null;const x=await this.redis.get(`session:${sid}`);return x?JSON.parse(x):null;}
   async logout(sid?:string){if(sid)await this.redis.del(`session:${sid}`);}
+  async logoutUser(userId:string){
+    let cursor='0',revoked=0;
+    do{
+      const [next,keys]=await this.redis.scan(cursor,'MATCH','session:*','COUNT',200);cursor=next;
+      if(keys.length){
+        const values=await this.redis.mget(...keys);const doomed:string[]=[];
+        for(let i=0;i<keys.length;i++)try{if(JSON.parse(values[i]||'{}')?.id===userId)doomed.push(keys[i]);}catch{}
+        if(doomed.length){revoked+=doomed.length;await this.redis.del(...doomed);}
+      }
+    }while(cursor!=='0');
+    return revoked;
+  }
 }

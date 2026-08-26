@@ -34,6 +34,7 @@ jobs:
           node tests/test_v20_ai_retrieval_context.js
           node tests/test_v20_ai_provenance_ids.js
           node tests/test_v20_ai_redteam_eval.js
+          node tests/test_v20_aitec_job_contract.js
       - name: Typecheck
         run: npm run typecheck
       - name: Build

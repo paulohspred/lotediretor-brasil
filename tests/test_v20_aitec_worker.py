@@ -88,4 +88,32 @@ try:
 finally:
     worker.urllib.request.urlopen=original
 
-print('v20 A.I TEC worker engine trust-boundary tests OK')
+# Queue telemetry must remain low-cardinality. Tenant/project/job/operation identifiers
+# are deliberately excluded from labels; they remain in logs/persisted evidence instead.
+assert tuple(worker.JOB_STATE._labelnames)==('status',)
+assert tuple(worker.OLDEST_JOB_AGE._labelnames)==('status',)
+assert tuple(worker.JOB_EXECUTIONS._labelnames)==('result',)
+assert tuple(worker.STALE_RECLAIMS._labelnames)==('result',)
+for metric in (worker.JOB_STATE,worker.OLDEST_JOB_AGE,worker.JOB_EXECUTIONS,worker.STALE_RECLAIMS):
+    labels=set(metric._labelnames)
+    assert not labels.intersection({'tenant','tenant_id','project','project_id','job','job_id','operation'}),labels
+
+class FakeRows:
+    def __init__(self,rows): self.rows=rows
+    def fetchall(self): return self.rows
+
+class FakeConn:
+    def execute(self,sql,*args,**kwargs):
+        assert 'from aitec.job' in sql.lower()
+        return FakeRows([('QUEUED',3,12.5),('RUNNING',1,2.0),('FAILED',2,90.0)])
+
+worker._last_metrics_refresh=0.0
+worker.refresh_queue_metrics(FakeConn(),force=True)
+assert worker.JOB_STATE.labels(status='QUEUED')._value.get()==3
+assert worker.JOB_STATE.labels(status='RUNNING')._value.get()==1
+assert worker.JOB_STATE.labels(status='COMPLETED')._value.get()==0
+assert worker.JOB_STATE.labels(status='CANCELLED')._value.get()==0
+assert worker.OLDEST_JOB_AGE.labels(status='FAILED')._value.get()==90.0
+assert worker.LAST_DB_SUCCESS._value.get()>0
+
+print('v20 A.I TEC worker trust-boundary + low-cardinality telemetry tests OK')

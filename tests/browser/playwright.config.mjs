@@ -4,7 +4,7 @@ const artifactRoot=process.env.PLAYWRIGHT_ARTIFACT_DIR||'/artifacts';
 
 export default defineConfig({
   testDir: '.',
-  testMatch: [/platform\.spec\.mjs/,/critical-journeys\.spec\.mjs/],
+  testMatch: [/platform\.spec\.mjs/,/critical-journeys\.spec\.mjs/,/aitec-job\.spec\.mjs/],
   timeout: 120_000,
   expect: {timeout: 15_000},
   retries: 1,

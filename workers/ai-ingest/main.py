@@ -115,7 +115,10 @@ def process_one():
                 embedding_dimension=EMBED_DIM,
                 embedding_fingerprint=_embedding_fingerprint(),
             )
-        r=requests.put(f'{OPENSEARCH}/{INDEX}/_doc/{rid}',json=payload,auth=_auth(),timeout=20);r.raise_for_status()
+        # indexed_at is a search-readiness contract, not merely an acknowledgement
+        # that OpenSearch accepted the write. Waiting for the next refresh prevents
+        # consumers from observing indexed_at while the document is still invisible.
+        r=requests.put(f'{OPENSEARCH}/{INDEX}/_doc/{rid}?refresh=wait_for',json=payload,auth=_auth(),timeout=20);r.raise_for_status()
         with c.transaction():c.execute('update ingest.document_text set indexed_at=now(),index_error=null where id=%s',(rid,))
       except Exception as exc:
         with c.transaction():c.execute('update ingest.document_text set index_error=%s where id=%s',(str(exc)[:1000],rid))

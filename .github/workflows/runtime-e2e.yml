@@ -46,7 +46,10 @@ jobs:
       KEYCLOAK_ADMIN: ci-admin
       KEYCLOAK_ADMIN_PASSWORD: ci-keycloak-admin-2026
       OIDC_CLIENT_ID: lotediretor-app
-      OIDC_CLIENT_SECRET: ci-oidc-client-secret-2026
+      # The CI realm is the repository's imported local realm fixture. Keep the
+      # confidential-client secret aligned so the browser gate exercises the
+      # real authorization-code exchange instead of a mocked session.
+      OIDC_CLIENT_SECRET: local-lotediretor-secret
       SESSION_COOKIE_SECURE: 'false'
       ALLOW_LOCAL_AUTO_MEMBERSHIP: 'true'
       BACKUP_DIR: ./backups-ci

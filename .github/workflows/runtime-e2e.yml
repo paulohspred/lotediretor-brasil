@@ -17,7 +17,7 @@ permissions:
 jobs:
   docker-runtime:
     runs-on: ubuntu-latest
-    timeout-minutes: 70
+    timeout-minutes: 75
     env:
       COMPOSE_PROJECT_NAME: lotediretor_ci
       COMPOSE_FILE: docker-compose.yml:docker-compose.ci.yml:docker-compose.ops.yml
@@ -46,9 +46,6 @@ jobs:
       KEYCLOAK_ADMIN: ci-admin
       KEYCLOAK_ADMIN_PASSWORD: ci-keycloak-admin-2026
       OIDC_CLIENT_ID: lotediretor-app
-      # The CI realm is the repository's imported local realm fixture. Keep the
-      # confidential-client secret aligned so the browser gate exercises the
-      # real authorization-code exchange instead of a mocked session.
       OIDC_CLIENT_SECRET: local-lotediretor-secret
       SESSION_COOKIE_SECURE: 'false'
       ALLOW_LOCAL_AUTO_MEMBERSHIP: 'true'
@@ -114,7 +111,10 @@ jobs:
       - name: Prove OpenSearch ingest and retrieval isolation
         run: ./ops/ai/runtime-integration.sh
 
-      - name: Prove browser OIDC mobile and accessibility journeys
+      - name: Seed explicitly synthetic browser critical-journey fixtures
+        run: bash ./ops/browser/seed-critical-journeys.sh
+
+      - name: Prove browser OIDC mobile accessibility and critical business journeys
         run: bash ./ops/browser/run-e2e.sh
 
       - name: Prove runtime security boundaries

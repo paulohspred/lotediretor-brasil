@@ -17,7 +17,7 @@ permissions:
 jobs:
   docker-runtime:
     runs-on: ubuntu-latest
-    timeout-minutes: 50
+    timeout-minutes: 55
     env:
       COMPOSE_PROJECT_NAME: lotediretor_ci
       COMPOSE_FILE: docker-compose.yml:docker-compose.ci.yml
@@ -103,6 +103,14 @@ jobs:
 
       - name: Prove OpenSearch ingest and retrieval isolation
         run: ./ops/ai/runtime-integration.sh
+
+      - name: Prove browser OIDC mobile and accessibility journeys
+        run: bash ./ops/browser/run-e2e.sh
+
+      - name: Run short multi-service load regression gate
+        env:
+          LOAD_PROFILE: ci
+        run: bash ./ops/load/run.sh
 
       - name: Run backup and restore drill
         run: |

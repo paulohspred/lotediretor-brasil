@@ -1,1 +1,1 @@
-import {AdminShell} from '../../components/AdminShell';import {AdminData} from '../../components/AdminData';export default function Page(){return <AdminShell><AdminData title="Billing / Ledger" endpoint="/control/v1/billing/summary"/></AdminShell>}
+import {AdminShell} from '../../components/AdminShell';import {BillingWorkspace} from '../../components/BillingWorkspace';export default function Page(){return <AdminShell><BillingWorkspace/></AdminShell>}

@@ -18,6 +18,8 @@ POLL_SECONDS = max(0.2, float(os.getenv('AITEC_JOB_POLL_SECONDS', '1')))
 TIMEOUT_SECONDS = max(5.0, float(os.getenv('AITEC_JOB_TIMEOUT_SECONDS', '180')))
 MAX_ATTEMPTS = max(1, int(os.getenv('AITEC_JOB_MAX_ATTEMPTS', '3')))
 STALE_SECONDS = max(60, int(os.getenv('AITEC_JOB_STALE_SECONDS', '600')))
+RETRY_BASE_SECONDS = max(1, int(os.getenv('AITEC_JOB_RETRY_BASE_SECONDS', '5')))
+RETRY_MAX_SECONDS = max(RETRY_BASE_SECONDS, int(os.getenv('AITEC_JOB_RETRY_MAX_SECONDS', '60')))
 MAX_RESPONSE_BYTES = max(1024, int(os.getenv('AITEC_JOB_MAX_RESPONSE_BYTES', str(32 * 1024 * 1024))))
 METRICS_PORT = max(1, int(os.getenv('AITEC_METRICS_PORT', '9104')))
 METRICS_REFRESH_SECONDS = max(1.0, float(os.getenv('AITEC_METRICS_REFRESH_SECONDS', '5')))
@@ -45,6 +47,11 @@ class EngineFailure(Exception):
 
     def __str__(self) -> str:
         return self.message
+
+
+def retry_delay_seconds(attempts: int) -> int:
+    exponent=max(0,int(attempts)-1)
+    return min(RETRY_MAX_SECONDS, RETRY_BASE_SECONDS*(2**exponent))
 
 
 def refresh_queue_metrics(conn: psycopg.Connection, force: bool = False) -> None:
@@ -75,10 +82,11 @@ def reclaim_stale(conn: psycopg.Connection) -> None:
             """update aitec.job
                set status=case when attempts >= %s then 'FAILED' else 'QUEUED' end,
                    error=case when attempts >= %s then coalesce(error,'worker_stale_after_max_attempts') else 'worker_stale_requeued' end,
-                   completed_at=case when attempts >= %s then now() else null end
+                   completed_at=case when attempts >= %s then now() else null end,
+                   next_attempt_at=case when attempts >= %s then next_attempt_at else now()+(%s||' seconds')::interval end
                where status='RUNNING' and started_at < now()-(%s||' seconds')::interval
                returning status""",
-            (MAX_ATTEMPTS, MAX_ATTEMPTS, MAX_ATTEMPTS, str(STALE_SECONDS)),
+            (MAX_ATTEMPTS, MAX_ATTEMPTS, MAX_ATTEMPTS, MAX_ATTEMPTS, str(RETRY_BASE_SECONDS), str(STALE_SECONDS)),
         ).fetchall()
     for (status,) in rows:
         STALE_RECLAIMS.labels(result='failed' if status == 'FAILED' else 'requeued').inc()
@@ -91,8 +99,8 @@ def claim(conn: psycopg.Connection):
         row = conn.execute(
             """select id,tenant_id,project_id,constraint_snapshot_id,operation,args,kwargs,execution_context,attempts
                from aitec.job
-               where status='QUEUED'
-               order by created_at,id
+               where status='QUEUED' and next_attempt_at <= now()
+               order by next_attempt_at,created_at,id
                for update skip locked
                limit 1"""
         ).fetchone()
@@ -197,12 +205,14 @@ def complete(conn: psycopg.Connection, job: dict, response: dict) -> None:
 
 def fail(conn: psycopg.Connection, job: dict, error: EngineFailure) -> bool:
     terminal = (not error.retryable) or job['attempts'] >= MAX_ATTEMPTS
+    delay=retry_delay_seconds(job['attempts'])
     with conn.transaction():
         conn.execute(
             """update aitec.job
-               set status=%s,error=%s,completed_at=case when %s then now() else null end
+               set status=%s,error=%s,completed_at=case when %s then now() else null end,
+                   next_attempt_at=case when %s then next_attempt_at else now()+(%s||' seconds')::interval end
                where id=%s and status='RUNNING'""",
-            ('FAILED' if terminal else 'QUEUED', str(error)[:2000], terminal, job['id']),
+            ('FAILED' if terminal else 'QUEUED', str(error)[:2000], terminal, terminal, str(delay), job['id']),
         )
         if terminal:
             conn.execute(
@@ -251,7 +261,8 @@ def main() -> None:
     start_http_server(METRICS_PORT, addr='0.0.0.0')
     WORKER_READY.set(1)
     print(
-        f'aitec-worker engine={ENGINE} max_attempts={MAX_ATTEMPTS} stale_seconds={STALE_SECONDS} metrics_port={METRICS_PORT}',
+        f'aitec-worker engine={ENGINE} max_attempts={MAX_ATTEMPTS} stale_seconds={STALE_SECONDS} '
+        f'retry_base_seconds={RETRY_BASE_SECONDS} retry_max_seconds={RETRY_MAX_SECONDS} metrics_port={METRICS_PORT}',
         flush=True,
     )
     while True:

@@ -19,6 +19,9 @@ scrape_configs:
   - job_name: aitec-engine
     metrics_path: /metrics
     static_configs: [{targets: ['aitec-engine:8002']}]
+  - job_name: aitec-worker
+    metrics_path: /metrics
+    static_configs: [{targets: ['aitec-worker:9104']}]
   - job_name: blackbox-http
     metrics_path: /probe
     params:

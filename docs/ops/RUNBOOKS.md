@@ -43,6 +43,19 @@ Alerta: `LoteDiretorHighP95Latency`.
 4. Executar `LOAD_PROFILE=capacity bash ops/load/run.sh` somente em ambiente isolado/Cortex/staging.
 5. Não mover processamento pesado para request síncrona apenas para simplificar teste; usar jobs quando o Blueprint exigir processamento assíncrono.
 
+## A.I TEC job queue or worker failure
+
+Alertas: `LoteDiretorAitecWorkerDown`, `LoteDiretorAitecWorkerDbStale`, `LoteDiretorAitecQueueBacklog`, `LoteDiretorAitecQueueStalled`, `LoteDiretorAitecQueueCriticallyStalled`, `LoteDiretorAitecJobFailures` e `LoteDiretorAitecRetryStorm`.
+
+1. Confirmar o target `aitec-worker` e as séries `lotediretor_aitec_jobs`, `lotediretor_aitec_oldest_job_age_seconds`, `lotediretor_aitec_job_executions_total`, `lotediretor_aitec_job_stale_reclaims_total` e `lotediretor_aitec_worker_last_db_success_unixtime`.
+2. Executar `docker compose ps aitec-worker aitec-engine platform-db` e preservar logs dos três componentes antes de reiniciar qualquer processo.
+3. Se o worker estiver vivo mas `last_db_success` estiver stale, validar DNS, credenciais da role `lotediretor_worker`, PostgreSQL e migration `213_v20_aitec_jobs.sql`; não substituir a role por owner/migration user.
+4. Para backlog, comparar profundidade e idade da fila. Aumentar concorrência/capacidade só após confirmar que o engine e o banco suportam o novo limite; não apagar jobs para reduzir a métrica.
+5. Para retries, diferenciar `429/5xx/unreachable` de falha não-retryable de contrato/contexto. Mismatch de tenant, projeto ou constraint é fail-closed e nunca deve ser convertido em retry permissivo.
+6. Jobs `RUNNING` stale são reencaminhados apenas até `AITEC_JOB_MAX_ATTEMPTS`; após o limite devem terminar `FAILED`, com evento `aitec.job.failed` e evidência preservada.
+7. Após recuperação, executar o E2E `A.I TEC job`, o teste de trust boundary do worker, RLS runtime e o profile k6 `ci`. Confirmar que nenhum job cross-tenant se tornou visível e que `professional_review_required=true` continua preservado.
+8. Em produção, registrar quantidade afetada, duração do backlog, causa, retries, eventual rollback e owner da correção. Não classificar o incidente como encerrado apenas porque a fila voltou a zero.
+
 ## OIDC/login failure
 
 1. Confirmar `/login`, `/api/v1/auth/start`, issuer público/interno e callback configurado.
@@ -70,8 +83,9 @@ Alerta: `LoteDiretorHighP95Latency`.
 
 1. Rodar `bash ops/observability/runtime-gate.sh` com profiles `full,ops` e override `docker-compose.ops.yml`.
 2. Confirmar OTel Collector `:13133`, Tempo `:3200/ready`, Loki `:3100/ready`, Promtail `:9080/ready`, Alertmanager e Prometheus.
-3. Verificar que platform/control/Solar/A.I TEC aparecem UP nos targets.
-4. Falha de telemetria não deve interromper uma request de negócio, mas deve impedir homologação operacional enquanto invisibilidade persistir.
+3. Verificar que platform/control/Solar/A.I TEC engine e `aitec-worker` aparecem UP nos targets.
+4. Para o worker, validar que `/metrics` contém profundidade/idade da fila e timestamp recente do último ciclo DB; target UP sozinho não prova processamento saudável.
+5. Falha de telemetria não deve interromper uma request de negócio, mas deve impedir homologação operacional enquanto invisibilidade persistir.
 
 ## Canary and rollback
 

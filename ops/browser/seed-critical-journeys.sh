@@ -61,8 +61,6 @@ ON CONFLICT DO NOTHING;
 UPDATE planning.zone SET geom=ST_Multi(ST_GeomFromText('POLYGON((-46.634 -23.551,-46.633 -23.551,-46.633 -23.55,-46.634 -23.55,-46.634 -23.551))',4326)),source_snapshot_id='0198f230-1000-7000-8000-000000000001',valid_to=NULL
 WHERE id='0198f230-4000-7000-8000-000000000001';
 
--- Ensure a current local entitlement exists without replacing billing-derived
--- snapshots in non-local environments. This fixture targets only LOCAL_ORG.
 UPDATE core.entitlement_snapshot SET valid_to=now()
 WHERE organization_id='0198f001-0000-7000-8000-000000000001' AND valid_to IS NULL;
 INSERT INTO core.entitlement_snapshot(organization_id,snapshot,valid_from)
@@ -78,13 +76,19 @@ cat /tmp/ld-browser-critical-fixtures.sql | docker compose exec -T \
 
 cat >/tmp/ld-browser-billing-fixtures.sql <<'SQL'
 BEGIN;
--- Represents a payment provider settlement already verified by the provider adapter.
--- It is deliberately synthetic and used only so browser E2E can exercise the real
--- allocation -> paid invoice -> entitlement materialization path without a live PSP.
+-- Two independent synthetic settled payments prevent the API and UI browser
+-- journeys from competing for the same allocatable amount.
 INSERT INTO billing.payment(id,tenant_id,provider,provider_payment_id,amount_cents,currency,status,gross_cents,fee_cents,net_cents,created_at)
 VALUES(
  '0198f231-0000-7000-8000-000000000001','0198f101-0000-7000-8000-000000000001',
  'E2E_FIXTURE','browser-critical-paid-001',12345,'BRL','PAID',12345,0,12345,now()
+)
+ON CONFLICT(provider,provider_payment_id) DO UPDATE SET status='PAID',amount_cents=12345,gross_cents=12345,fee_cents=0,net_cents=12345;
+
+INSERT INTO billing.payment(id,tenant_id,provider,provider_payment_id,amount_cents,currency,status,gross_cents,fee_cents,net_cents,created_at)
+VALUES(
+ '0198f231-0000-7000-8000-000000000002','0198f101-0000-7000-8000-000000000001',
+ 'E2E_FIXTURE','browser-ui-paid-002',12345,'BRL','PAID',12345,0,12345,now()
 )
 ON CONFLICT(provider,provider_payment_id) DO UPDATE SET status='PAID',amount_cents=12345,gross_cents=12345,fee_cents=0,net_cents=12345;
 COMMIT;
@@ -94,4 +98,4 @@ cat /tmp/ld-browser-billing-fixtures.sql | docker compose exec -T \
   -e PGPASSWORD="$CONTROL_DB_MIGRATION_PASSWORD" control-db \
   psql -h 127.0.0.1 -U "$CONTROL_DB_MIGRATION_USER" -d "$CONTROL_DB_NAME" -v ON_ERROR_STOP=1
 
-echo 'Critical browser journey fixtures PASS (synthetic/non-official; payment fixture synthetic)'
+echo 'Critical browser journey fixtures PASS (synthetic/non-official; isolated payment fixtures synthetic)'

@@ -17,11 +17,11 @@ permissions:
 jobs:
   docker-runtime:
     runs-on: ubuntu-latest
-    timeout-minutes: 55
+    timeout-minutes: 60
     env:
       COMPOSE_PROJECT_NAME: lotediretor_ci
-      COMPOSE_FILE: docker-compose.yml:docker-compose.ci.yml
-      COMPOSE_PROFILES: full
+      COMPOSE_FILE: docker-compose.yml:docker-compose.ci.yml:docker-compose.ops.yml
+      COMPOSE_PROFILES: full,ops
       COMPOSE_PARALLEL_LIMIT: 2
       HTTP_PORT: 8080
       PLATFORM_DB_MIGRATION_USER: lotediretor
@@ -52,6 +52,8 @@ jobs:
       OIDC_CLIENT_SECRET: local-lotediretor-secret
       SESSION_COOKIE_SECURE: 'false'
       ALLOW_LOCAL_AUTO_MEMBERSHIP: 'true'
+      GRAFANA_ADMIN_USER: ci-admin
+      GRAFANA_ADMIN_PASSWORD: ci-grafana-admin-2026
       BACKUP_DIR: ./backups-ci
       BACKUP_RETENTION_DAYS: 0
 
@@ -84,7 +86,7 @@ jobs:
         run: docker compose up -d
 
       - name: Wait for healthy runtime
-        run: ./ops/runtime/wait-healthy.sh 420
+        run: ./ops/runtime/wait-healthy.sh 480
 
       - name: Verify schema migrations completed
         run: |
@@ -101,6 +103,9 @@ jobs:
       - name: Prove non-owner cross-tenant RLS isolation
         run: ./ops/rls/runtime-isolation.sh
 
+      - name: Prove privacy LGPD RLS legal-hold and retention guards
+        run: ./ops/privacy/runtime-integration.sh
+
       - name: Prove Municipality Factory DB guards and tenant isolation
         run: ./ops/municipality/factory-runtime.sh
 
@@ -109,6 +114,9 @@ jobs:
 
       - name: Prove browser OIDC mobile and accessibility journeys
         run: bash ./ops/browser/run-e2e.sh
+
+      - name: Prove observability components targets probes and rules
+        run: bash ./ops/observability/runtime-gate.sh
 
       - name: Run short multi-service load regression gate
         env:

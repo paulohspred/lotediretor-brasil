@@ -8,7 +8,7 @@ PROFILE="${1:-${CORTEX_LOAD_PROFILE:-ci}}"
 case "$PROFILE" in ci|soak|capacity) ;; *) echo "usage: $0 [ci|soak|capacity]" >&2; exit 2;; esac
 
 export COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-lotediretor_cortex}"
-export COMPOSE_FILE="${COMPOSE_FILE:-docker-compose.yml:docker-compose.ci.yml}"
+export COMPOSE_FILE="${COMPOSE_FILE:-docker-compose.yml:docker-compose.ci.yml:docker-compose.ops.yml}"
 export COMPOSE_PROFILES="${COMPOSE_PROFILES:-full,ops}"
 export COMPOSE_PARALLEL_LIMIT="${COMPOSE_PARALLEL_LIMIT:-2}"
 export HTTP_PORT="${HTTP_PORT:-8080}"

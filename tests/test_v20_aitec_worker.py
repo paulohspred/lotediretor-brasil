@@ -4,6 +4,7 @@ import importlib.util
 import json
 import os
 import pathlib
+import sys
 import urllib.error
 
 os.environ.setdefault('PLATFORM_DATABASE_URL','postgresql://unused')
@@ -12,8 +13,9 @@ os.environ.setdefault('AITEC_JOB_MAX_RESPONSE_BYTES','4096')
 
 ROOT=pathlib.Path(__file__).resolve().parents[1]
 spec=importlib.util.spec_from_file_location('aitec_worker',ROOT/'workers'/'aitec'/'main.py')
-worker=importlib.util.module_from_spec(spec)
 assert spec and spec.loader
+worker=importlib.util.module_from_spec(spec)
+sys.modules[spec.name]=worker
 spec.loader.exec_module(worker)
 
 JOB={

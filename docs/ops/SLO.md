@@ -76,9 +76,13 @@ Disponibilidade não pode sobrepor segurança. Respostas 401/403 legítimas não
 
 Métricas HTTP não carregam tenant, project, job, document ou resource IDs como labels. Identificadores necessários para investigação permanecem em traces/logs/evidência persistida, evitando cardinalidade explosiva e exposição acidental no plano de métricas.
 
-## Dados e recuperação
+## Dados, backup e recuperação
 
-Backup/restore local é um gate reproduzível. RPO/RTO de produção só pode ser definido como cumprido após um DR drill em infraestrutura equivalente à produção com timestamps de falha, último ponto recuperável, início/fim de restore e validação pós-restore. O harness pré-Cortex não converte um restore local em evidência de HA/DR de produção.
+O harness local/Cortex agora mede **RPO e RTO sintéticos** para um restore completo de PostgreSQL + object storage. O backup registra início/fim da janela de captura em metadata incluído no manifesto SHA-256. O drill restaura ambos os bancos em databases temporários, exige contratos críticos de schema, restaura o conteúdo de object storage em bucket temporário e compara checksums byte a byte.
+
+Para o drill local, a falha é simulada imediatamente após a conclusão da captura. O RPO sintético conservador é `simulated_failure_epoch - backup_started_epoch`; o RTO é o tempo entre início do drill e conclusão das validações pós-restore. A evidência é persistida em `ops.dr_drill` e também como JSON classificado `LOCAL_SYNTHETIC_DR_EVIDENCE_NOT_PRODUCTION_HOMOLOGATION`.
+
+Esses números **não são RPO/RTO de produção**. A homologação real exige infraestrutura equivalente à produção, timestamp real da falha, último ponto durável recuperável (incluindo PITR quando aplicável), início/fim do restore/failover, validação de integridade e dependências externas. O harness pré-Cortex prova capacidade e reprodutibilidade, não HA/DR produtivo.
 
 ## Owners
 

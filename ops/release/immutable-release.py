@@ -28,6 +28,7 @@ image_vars={
  'AI_GATEWAY_IMAGE':'ghcr.io/lotediretor/ai-gateway',
  'SOLAR_ENGINE_IMAGE':'ghcr.io/lotediretor/solar-engine',
  'AITEC_ENGINE_IMAGE':'ghcr.io/lotediretor/aitec-engine',
+ 'AITEC_WORKER_IMAGE':'ghcr.io/lotediretor/aitec-worker',
  'EVENT_DISPATCHER_IMAGE':'ghcr.io/lotediretor/event-dispatcher',
  'GEO_WORKER_IMAGE':'ghcr.io/lotediretor/geo-worker',
  'DOCUMENT_WORKER_IMAGE':'ghcr.io/lotediretor/document-worker',
@@ -51,7 +52,7 @@ except subprocess.CalledProcessError as exc:
  print(exc.output,file=sys.stderr);raise SystemExit('immutable release render failed')
 model=json.loads(raw);services=model.get('services') or {}
 expected={
- 'platform-api','platform-migrate','control-api','control-migrate','ai-gateway','solar-engine','aitec-engine',
+ 'platform-api','platform-migrate','control-api','control-migrate','ai-gateway','solar-engine','aitec-engine','aitec-worker',
  'event-dispatcher','geo-worker','document-worker','report-worker','rural-monitor-worker','rural-export-worker',
  'billing-worker','data-pipelines','ai-ingest','site-web','client-web','admin-web'
 }
@@ -63,7 +64,6 @@ for name in sorted(expected):
  if svc.get('build') not in (None,{}): errors.append(f'{name} still contains build configuration')
  image=str(svc.get('image') or '')
  if not pattern.match(image): errors.append(f'{name} image is not immutable digest:{image!r}')
-# Migrations must execute exactly the same artifact as their APIs.
 if services.get('platform-api',{}).get('image')!=services.get('platform-migrate',{}).get('image'):
  errors.append('platform migration artifact differs from platform-api artifact')
 if services.get('control-api',{}).get('image')!=services.get('control-migrate',{}).get('image'):

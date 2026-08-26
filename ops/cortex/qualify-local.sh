@@ -49,6 +49,7 @@ export OBSERVABILITY_ARTIFACT_DIR="$ARTIFACT_DIR/observability"
 export RESILIENCE_ARTIFACT_DIR="$ARTIFACT_DIR/resilience"
 export SECURITY_ARTIFACT_DIR="$ARTIFACT_DIR/security"
 export DR_ARTIFACT_DIR="$ARTIFACT_DIR/dr"
+export RELEASE_ARTIFACT_DIR="$ARTIFACT_DIR/release"
 mkdir -p "$ARTIFACT_DIR"
 GATE_LEDGER="$ARTIFACT_DIR/gate-status.tsv"
 printf 'gate\tstatus\tstarted_at_utc\tcompleted_at_utc\tduration_seconds\n' > "$GATE_LEDGER"
@@ -146,6 +147,7 @@ run_gate production_parity sh -c "python3 ops/security/production-parity.py > '$
 run_gate staging_parity sh -c "python3 ops/staging/production-equivalence.py > '$ARTIFACT_DIR/staging-parity.json'"
 run_gate immutable_release sh -c "python3 ops/release/immutable-release.py > '$ARTIFACT_DIR/immutable-release.json'"
 run_gate rollback_contract sh -c "bash ops/release/rollback-drill.sh --self-test > '$ARTIFACT_DIR/rollback-contract.txt'"
+run_gate signature_contract sh -c "bash ops/release/verify-signatures.sh --self-test > '$ARTIFACT_DIR/signature-contract.txt'"
 run_gate compose_model sh -c "docker compose config > '$ARTIFACT_DIR/compose-config.yml'"
 run_gate build_images docker compose build
 

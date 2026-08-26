@@ -3,7 +3,10 @@ import {test,expect} from '@playwright/test';
 const ADMIN='admin@lotediretor.local';
 const PASSWORD='lotediretor';
 const TENANT='0198f101-0000-7000-8000-000000000001';
-const PAYMENT='0198f231-0000-7000-8000-000000000002';
+const PAYMENTS=[
+  '0198f231-0000-7000-8000-000000000002',
+  '0198f231-0000-7000-8000-000000000003',
+];
 
 async function login(page){
   await page.goto('/admin/billing',{waitUntil:'domcontentloaded'});
@@ -17,14 +20,15 @@ async function login(page){
   ]);
 }
 
-test('critical UI journey: admin billing -> paid invoice -> synchronized entitlement',async({page})=>{
+test('critical UI journey: admin billing -> paid invoice -> synchronized entitlement',async({page},testInfo)=>{
   await login(page);
   const nonce=Date.now();
+  const payment=PAYMENTS[Math.min(testInfo.retry,PAYMENTS.length-1)];
   await expect(page.getByRole('heading',{name:'Billing / Entitlements'})).toBeVisible();
 
   await page.getByLabel('Tenant ID').fill(TENANT);
-  await page.getByLabel('Payment ID').fill(PAYMENT);
-  await page.getByLabel('Número da fatura').fill(`E2E-UI-ENTITLEMENT-${nonce}`);
+  await page.getByLabel('Payment ID').fill(payment);
+  await page.getByLabel('Número da fatura').fill(`E2E-UI-ENTITLEMENT-${testInfo.retry}-${nonce}`);
   await page.getByLabel('Valor em centavos').fill('12345');
 
   const plan=page.getByLabel('Plano');

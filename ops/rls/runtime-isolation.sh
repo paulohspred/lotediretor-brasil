@@ -46,7 +46,7 @@ DO $$ DECLARE n integer; BEGIN
    INSERT INTO aitec.job(id,tenant_id,project_id,operation,args,kwargs,execution_context,status,created_by)
    VALUES('0198f009-3000-7000-8000-000000000003','0198f009-0000-7000-8000-000000000002','0198f009-2000-7000-8000-000000000002','terrain.tin','[]','{}','{}','QUEUED','must-fail');
    RAISE EXCEPTION 'cross tenant A.I TEC job write unexpectedly succeeded';
- EXCEPTION WHEN insufficient_privilege THEN NULL; WHEN check_violation THEN NULL; WHEN foreign_key_violation THEN NULL;
+ EXCEPTION WHEN insufficient_privilege THEN NULL; WHEN check_violation THEN NULL;
  END;
 END $$;
 ROLLBACK;

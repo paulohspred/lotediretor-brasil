@@ -23,6 +23,9 @@ services:
   aitec-engine:
     build: !reset null
     image: ${AITEC_ENGINE_IMAGE:?immutable @sha256 image required}
+  aitec-worker:
+    build: !reset null
+    image: ${AITEC_WORKER_IMAGE:?immutable @sha256 image required}
   event-dispatcher:
     build: !reset null
     image: ${EVENT_DISPATCHER_IMAGE:?immutable @sha256 image required}

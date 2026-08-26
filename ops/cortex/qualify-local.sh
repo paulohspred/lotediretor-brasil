@@ -149,6 +149,12 @@ run_gate rollback_contract sh -c "bash ops/release/rollback-drill.sh --self-test
 run_gate compose_model sh -c "docker compose config > '$ARTIFACT_DIR/compose-config.yml'"
 run_gate build_images docker compose build
 
+if [[ "${CORTEX_TRIVY:-1}" == "1" ]]; then
+  run_gate security_trivy env TRIVY_PULL="${TRIVY_PULL:-1}" TRIVY_SCAN_IMAGES=1 bash ./ops/security/trivy-scan.sh
+else
+  record_skipped security_trivy 'disabled by CORTEX_TRIVY=0; full qualification will be rejected'
+fi
+
 docker compose up -d
 run_gate stack_health bash ./ops/runtime/wait-healthy.sh "${CORTEX_HEALTH_TIMEOUT:-480}"
 run_gate runtime_smoke bash ./ops/runtime/smoke.sh
@@ -165,7 +171,7 @@ run_gate security_baseline bash ./ops/security/runtime-baseline.sh
 if [[ "${CORTEX_ZAP:-0}" == "1" ]]; then
   run_gate zap_baseline bash ./ops/security/zap-baseline.sh
 else
-  record_skipped zap_baseline 'optional external scanner image not requested'
+  record_skipped zap_baseline 'optional DAST baseline not requested; independent pentest remains external'
 fi
 
 run_gate load_profile env LOAD_PROFILE="$PROFILE" bash ./ops/load/run.sh

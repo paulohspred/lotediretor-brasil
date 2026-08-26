@@ -47,9 +47,10 @@ export BACKUP_DIR="${BACKUP_DIR:-$ARTIFACT_DIR/backups}"
 export BROWSER_ARTIFACT_DIR="$ARTIFACT_DIR/browser"
 export LOAD_ARTIFACT_DIR="$ARTIFACT_DIR/load"
 export OBSERVABILITY_ARTIFACT_DIR="$ARTIFACT_DIR/observability"
+export RESILIENCE_ARTIFACT_DIR="$ARTIFACT_DIR/resilience"
 mkdir -p "$ARTIFACT_DIR"
 
-for cmd in docker python3; do command -v "$cmd" >/dev/null || { echo "$cmd is required" >&2; exit 1; }; done
+for cmd in docker python3 curl; do command -v "$cmd" >/dev/null || { echo "$cmd is required" >&2; exit 1; }; done
 docker compose version >/dev/null
 
 capture(){
@@ -124,6 +125,11 @@ bash ./ops/observability/runtime-gate.sh
 
 echo "==> Load profile: $PROFILE"
 LOAD_PROFILE="$PROFILE" bash ./ops/load/run.sh
+
+if [[ "${CORTEX_FAULT_INJECTION:-1}" == "1" ]]; then
+  echo '==> Controlled Docker fault injection and recovery'
+  bash ./ops/resilience/runtime-fault-injection.sh
+fi
 
 echo '==> Backup/restore drill'
 BACKUP_STAMP="cortex-$STAMP"

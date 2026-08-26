@@ -49,10 +49,37 @@ export LOAD_ARTIFACT_DIR="$ARTIFACT_DIR/load"
 export OBSERVABILITY_ARTIFACT_DIR="$ARTIFACT_DIR/observability"
 export RESILIENCE_ARTIFACT_DIR="$ARTIFACT_DIR/resilience"
 export SECURITY_ARTIFACT_DIR="$ARTIFACT_DIR/security"
+export DR_ARTIFACT_DIR="$ARTIFACT_DIR/dr"
 mkdir -p "$ARTIFACT_DIR"
+GATE_LEDGER="$ARTIFACT_DIR/gate-status.tsv"
+printf 'gate\tstatus\tstarted_at_utc\tcompleted_at_utc\tduration_seconds\n' > "$GATE_LEDGER"
 
 for cmd in docker python3 curl; do command -v "$cmd" >/dev/null || { echo "$cmd is required" >&2; exit 1; }; done
 docker compose version >/dev/null
+
+run_gate(){
+  local gate="$1";shift
+  local start_epoch end_epoch start_iso end_iso rc
+  start_epoch=$(date +%s)
+  start_iso=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+  echo "==> gate[$gate] $*"
+  if "$@"; then
+    rc=0
+    end_epoch=$(date +%s);end_iso=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+    printf '%s\tPASS\t%s\t%s\t%s\n' "$gate" "$start_iso" "$end_iso" "$((end_epoch-start_epoch))" >> "$GATE_LEDGER"
+  else
+    rc=$?
+    end_epoch=$(date +%s);end_iso=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+    printf '%s\tFAIL\t%s\t%s\t%s\n' "$gate" "$start_iso" "$end_iso" "$((end_epoch-start_epoch))" >> "$GATE_LEDGER"
+  fi
+  return "$rc"
+}
+
+record_skipped(){
+  local gate="$1" reason="$2" now
+  now=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+  printf '%s\tSKIPPED\t%s\t%s\t0\t%s\n' "$gate" "$now" "$now" "$reason" >> "$GATE_LEDGER"
+}
 
 capture(){
   local status="$1"
@@ -76,10 +103,20 @@ capture(){
 }
 
 finish(){
-  local code=$? status
+  local code=$? status report_rc=0
   trap - EXIT
   status="$([ "$code" -eq 0 ] && echo PASS || echo FAIL)"
   capture "$status"
+
+  python3 ./ops/cortex/qualification-report.py "$ARTIFACT_DIR" "$status" "$PROFILE" || report_rc=$?
+  if [[ "$code" -eq 0 && "$report_rc" -ne 0 ]]; then
+    echo 'Final qualification report rejected a nominal PASS; marking run FAIL.' >&2
+    code=1
+    status=FAIL
+    capture "$status"
+    python3 ./ops/cortex/qualification-report.py "$ARTIFACT_DIR" "$status" "$PROFILE" || true
+  fi
+
   if ! python3 ./ops/cortex/evidence-manifest.py "$ARTIFACT_DIR" "$status" "$PROFILE"; then
     echo 'Evidence manifest generation failed' >&2
     if [[ "$code" -eq 0 ]]; then
@@ -106,62 +143,39 @@ if [[ "${CORTEX_RESET:-1}" == "1" ]]; then
   docker compose down -v --remove-orphans || true
 fi
 
-echo '==> Validate Compose model'
-docker compose config > "$ARTIFACT_DIR/compose-config.yml"
+run_gate compose_model sh -c "docker compose config > '$ARTIFACT_DIR/compose-config.yml'"
+run_gate build_images docker compose build
 
-echo '==> Build application images'
-docker compose build
-
-echo '==> Start full + observability stack'
 docker compose up -d
-bash ./ops/runtime/wait-healthy.sh "${CORTEX_HEALTH_TIMEOUT:-480}"
-
-echo '==> Gateway/service smoke'
-bash ./ops/runtime/smoke.sh
-
-echo '==> A.I TEC advanced runtime'
-bash ./ops/aitec/runtime-integration.sh
-
-echo '==> Cross-tenant RLS isolation'
-bash ./ops/rls/runtime-isolation.sh
-
-echo '==> Privacy/LGPD RLS, legal hold and retention guards'
-bash ./ops/privacy/runtime-integration.sh
-
-echo '==> Municipality Factory guards/RLS'
-bash ./ops/municipality/factory-runtime.sh
-
-echo '==> OpenSearch AI ingest/retrieval isolation'
-bash ./ops/ai/runtime-integration.sh
-
-echo '==> Seed explicitly synthetic critical business-journey fixtures'
-bash ./ops/browser/seed-critical-journeys.sh
-
-echo '==> Browser/OIDC/mobile/a11y and critical business journeys'
-bash ./ops/browser/run-e2e.sh
-
-echo '==> Runtime security baseline'
-bash ./ops/security/runtime-baseline.sh
+run_gate stack_health bash ./ops/runtime/wait-healthy.sh "${CORTEX_HEALTH_TIMEOUT:-480}"
+run_gate runtime_smoke bash ./ops/runtime/smoke.sh
+run_gate aitec_runtime bash ./ops/aitec/runtime-integration.sh
+run_gate rls_isolation bash ./ops/rls/runtime-isolation.sh
+run_gate privacy_lgpd bash ./ops/privacy/runtime-integration.sh
+run_gate municipality_factory bash ./ops/municipality/factory-runtime.sh
+run_gate ai_retrieval bash ./ops/ai/runtime-integration.sh
+run_gate critical_fixture_seed bash ./ops/browser/seed-critical-journeys.sh
+run_gate browser_critical bash ./ops/browser/run-e2e.sh
+run_gate security_baseline bash ./ops/security/runtime-baseline.sh
 
 if [[ "${CORTEX_ZAP:-0}" == "1" ]]; then
-  echo '==> OWASP ZAP baseline'
-  bash ./ops/security/zap-baseline.sh
+  run_gate zap_baseline bash ./ops/security/zap-baseline.sh
+else
+  record_skipped zap_baseline 'optional external scanner image not requested'
 fi
 
-echo "==> Load profile: $PROFILE"
-LOAD_PROFILE="$PROFILE" bash ./ops/load/run.sh
+run_gate load_profile env LOAD_PROFILE="$PROFILE" bash ./ops/load/run.sh
 
 if [[ "${CORTEX_FAULT_INJECTION:-1}" == "1" ]]; then
-  echo '==> Controlled Docker fault injection and recovery'
-  bash ./ops/resilience/runtime-fault-injection.sh
+  run_gate fault_injection bash ./ops/resilience/runtime-fault-injection.sh
+else
+  record_skipped fault_injection 'disabled by CORTEX_FAULT_INJECTION=0; full qualification will be rejected'
 fi
 
-echo '==> Observability stack and Prometheus targets after resilience tests'
-bash ./ops/observability/runtime-gate.sh
+run_gate observability bash ./ops/observability/runtime-gate.sh
 
-echo '==> Backup/restore drill'
 BACKUP_STAMP="cortex-$STAMP"
-bash ./ops/backup/backup.sh "$BACKUP_STAMP"
-bash ./ops/backup/restore-drill.sh "$BACKUP_DIR/$BACKUP_STAMP"
+run_gate backup bash ./ops/backup/backup.sh "$BACKUP_STAMP"
+run_gate restore_dr bash ./ops/backup/restore-drill.sh "$BACKUP_DIR/$BACKUP_STAMP"
 
-echo 'Cortex local qualification PASS'
+echo 'Cortex local qualification gates completed; final report will decide PASS/FAIL.'

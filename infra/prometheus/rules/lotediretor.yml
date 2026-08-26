@@ -24,6 +24,14 @@ groups:
           summary: "Prometheus target unavailable"
           runbook: "docs/ops/RUNBOOKS.md#prometheus-target-missing"
 
+      - alert: LoteDiretorEdgeProbeDown
+        expr: probe_success{job="blackbox-http"} == 0
+        for: 2m
+        labels: {severity: critical}
+        annotations:
+          summary: "External HTTP probe failed for {{ $labels.instance }}"
+          runbook: "docs/ops/RUNBOOKS.md#service-or-database-down"
+
       - alert: LoteDiretorHigh5xxRate
         expr: lotediretor:http_5xx:ratio5m > 0.01
         for: 5m

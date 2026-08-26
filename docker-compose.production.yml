@@ -49,9 +49,6 @@ services:
     environment:
       NODE_ENV: production
       PLATFORM_DATABASE_URL: postgresql://${PLATFORM_DB_APP_USER:-lotediretor_app}:${PLATFORM_DB_APP_PASSWORD:?required}@platform-db:5432/${PLATFORM_DB_NAME:?required}
-      # Runtime API never receives the migration-owner DSN. The dedicated
-      # platform-migrate one-shot service is the only application container
-      # allowed to hold it in production.
       PLATFORM_MIGRATION_DATABASE_URL: ''
       SESSION_COOKIE_SECURE: 'true'
       ALLOW_LOCAL_AUTO_MEMBERSHIP: 'false'
@@ -66,8 +63,6 @@ services:
     environment:
       NODE_ENV: production
       CONTROL_DATABASE_URL: postgresql://${CONTROL_DB_APP_USER:-lotediretor_control_app}:${CONTROL_DB_APP_PASSWORD:?required}@control-db:5432/${CONTROL_DB_NAME:?required}
-      # Same least-privilege rule as platform-api: migrations run only in the
-      # dedicated control-migrate service.
       CONTROL_MIGRATION_DATABASE_URL: ''
       INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN:?required}
       MERCADOPAGO_WEBHOOK_SECRET: ${MERCADOPAGO_WEBHOOK_SECRET:-}
@@ -95,6 +90,21 @@ services:
     environment:
       APP_ENV: production
       INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN:?required}
+  aitec-worker:
+    build:
+      context: .
+      dockerfile: workers/aitec/Dockerfile
+    environment:
+      PLATFORM_DATABASE_URL: postgresql://lotediretor_worker:${PLATFORM_DB_WORKER_PASSWORD:?required}@platform-db:5432/${PLATFORM_DB_NAME:?required}
+      AITEC_ENGINE_INTERNAL_URL: ${AITEC_ENGINE_INTERNAL_URL:-http://aitec-engine:8002}
+      INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN:?required}
+    depends_on:
+      platform-db:
+        condition: service_healthy
+      platform-db-role-init:
+        condition: service_completed_successfully
+      aitec-engine:
+        condition: service_healthy
   gateway:
     ports: !override
     - 80:80
@@ -108,9 +118,6 @@ services:
     - caddy_data:/data
     - caddy_config:/config
   opensearch:
-    # Search remains internal to the Compose network. Publishing 9200 on the
-    # production host would bypass the gateway and the application ACL/tenant
-    # boundary even when the Docker network itself is private.
     ports: !reset []
   prometheus:
     ports: !reset []

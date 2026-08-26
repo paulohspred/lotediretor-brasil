@@ -16,10 +16,10 @@ INSERT INTO iam.membership(organization_id,user_id,role) VALUES
  ('0198f209-0000-7000-8000-000000000001','0198f209-1000-7000-8000-000000000001','admin'),
  ('0198f209-0000-7000-8000-000000000002','0198f209-1000-7000-8000-000000000002','admin')
 ON CONFLICT(organization_id,user_id) DO UPDATE SET role=excluded.role;
-DELETE FROM privacy.operation_event WHERE tenant_id IN ('0198f209-0000-7000-8000-000000000001','0198f209-0000-7000-8000-000000000002');
-DELETE FROM privacy.subject_request WHERE tenant_id IN ('0198f209-0000-7000-8000-000000000001','0198f209-0000-7000-8000-000000000002');
-DELETE FROM privacy.legal_hold WHERE tenant_id IN ('0198f209-0000-7000-8000-000000000001','0198f209-0000-7000-8000-000000000002');
-DELETE FROM privacy.retention_policy WHERE tenant_id IN ('0198f209-0000-7000-8000-000000000001','0198f209-0000-7000-8000-000000000002');
+-- Persistent foreign fixture used only to prove tenant A cannot see tenant B.
+INSERT INTO privacy.subject_request(id,tenant_id,subject_user_id,request_type,status,request_reason,requested_by)
+VALUES('0198f209-2000-7000-8000-000000000002','0198f209-0000-7000-8000-000000000002','0198f209-1000-7000-8000-000000000002','ACCESS','REQUESTED','foreign tenant fixture','0198f209-1000-7000-8000-000000000002')
+ON CONFLICT(id) DO NOTHING;
 COMMIT;
 SQL
 cat "$OWNER_SQL" | docker compose exec -T -e PGPASSWORD="$PLATFORM_DB_MIGRATION_PASSWORD" platform-db psql -h 127.0.0.1 -U "$PLATFORM_DB_MIGRATION_USER" -d "$PLATFORM_DB_NAME" -v ON_ERROR_STOP=1
@@ -28,18 +28,9 @@ APP_SQL=/tmp/ld-privacy-app.sql
 cat > "$APP_SQL" <<'SQL'
 BEGIN;
 SELECT set_config('app.tenant_id','0198f209-0000-7000-8000-000000000001',true);
-
 INSERT INTO privacy.subject_request(id,tenant_id,subject_user_id,request_type,status,request_reason,requested_by)
 VALUES('0198f209-2000-7000-8000-000000000001','0198f209-0000-7000-8000-000000000001','0198f209-1000-7000-8000-000000000001','ERASURE','REQUESTED','runtime proof','0198f209-1000-7000-8000-000000000001');
-INSERT INTO privacy.subject_request(id,tenant_id,subject_user_id,request_type,status,request_reason,requested_by)
-VALUES('0198f209-2000-7000-8000-000000000002','0198f209-0000-7000-8000-000000000002','0198f209-1000-7000-8000-000000000002','ACCESS','REQUESTED','foreign tenant seed','0198f209-1000-7000-8000-000000000002');
-SQL
-# The second insert must fail under tenant A RLS. Execute it separately so the intended exception does not abort the proof transaction.
-head -n 7 "$APP_SQL" | docker compose exec -T -e PGPASSWORD="$PLATFORM_DB_APP_PASSWORD" platform-db psql -h 127.0.0.1 -U "$PLATFORM_DB_APP_USER" -d "$PLATFORM_DB_NAME" -v ON_ERROR_STOP=1
 
-cat > "$APP_SQL" <<'SQL'
-BEGIN;
-SELECT set_config('app.tenant_id','0198f209-0000-7000-8000-000000000001',true);
 DO $$ DECLARE n integer; BEGIN
   SELECT count(*) INTO n FROM privacy.subject_request;
   IF n<>1 THEN RAISE EXCEPTION 'privacy RLS expected 1 visible request, got %',n; END IF;
@@ -78,7 +69,8 @@ DO $$ BEGIN
 END $$;
 
 INSERT INTO privacy.retention_policy(tenant_id,data_category,retention_days,expiry_action,legal_basis,automatic_execution,protected_class,owner)
-VALUES('0198f209-0000-7000-8000-000000000001','AUDIT_TRAIL',365,'RETAIN','runtime basis',false,true,'runtime');
+VALUES('0198f209-0000-7000-8000-000000000001','AUDIT_TRAIL',365,'RETAIN','runtime basis',false,true,'runtime')
+ON CONFLICT(tenant_id,data_category) DO UPDATE SET retention_days=excluded.retention_days,expiry_action='RETAIN',legal_basis=excluded.legal_basis,automatic_execution=false,protected_class=true,owner=excluded.owner;
 DO $$ BEGIN
   BEGIN
     UPDATE privacy.retention_policy SET expiry_action='DELETE',protected_class=false WHERE tenant_id='0198f209-0000-7000-8000-000000000001' AND data_category='AUDIT_TRAIL';

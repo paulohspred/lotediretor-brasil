@@ -53,17 +53,33 @@ if [[ "$SCAN_IMAGES" == "1" ]]; then
   echo "==> Trivy locally built application images"
   mapfile -t images < <(docker compose images --format json 2>/dev/null | python3 -c '
 import json,sys
+raw=sys.stdin.read().strip()
+items=[]
+if raw:
+    try:
+        parsed=json.loads(raw)
+        items=parsed if isinstance(parsed,list) else [parsed] if isinstance(parsed,dict) else []
+    except Exception:
+        for line in raw.splitlines():
+            try:
+                value=json.loads(line)
+            except Exception:
+                continue
+            if isinstance(value,list): items.extend(x for x in value if isinstance(x,dict))
+            elif isinstance(value,dict): items.append(value)
 seen=set()
-for line in sys.stdin:
-    try: x=json.loads(line)
-    except Exception: continue
+for x in items:
     repo=str(x.get("Repository") or x.get("repository") or "").strip()
     tag=str(x.get("Tag") or x.get("tag") or "").strip()
-    image=str(x.get("Image") or x.get("image") or "").strip()
+    image=str(x.get("Image") or x.get("image") or x.get("ID") or x.get("id") or "").strip()
     ref=(repo+(":"+tag if tag and tag!="<none>" else "")) if repo and repo!="<none>" else image
     if ref and ref!="<none>" and ref not in seen:
         seen.add(ref);print(ref)
 ')
+  if [[ "${#images[@]}" -eq 0 ]]; then
+    echo 'TRIVY_SCAN_IMAGES=1 but no Compose images were discovered' >&2
+    exit 1
+  fi
   : > "$ARTIFACT_DIR/trivy-images.tsv"
   for image in "${images[@]}"; do
     safe=$(printf '%s' "$image" | sed -E 's#[^A-Za-z0-9_.-]+#_#g')

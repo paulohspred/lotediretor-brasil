@@ -5,11 +5,12 @@ harness=(root/'ops/cortex/qualify-local.sh').read_text()
 report=(root/'ops/cortex/qualification-report.py').read_text()
 manifest=(root/'ops/cortex/evidence-manifest.py').read_text()
 security=(root/'ops/security/runtime-baseline.sh').read_text()
+redteam=(root/'ops/security/ai-redteam-runtime.sh').read_text()
 
 required=[
  'production_parity','staging_parity','immutable_release','rollback_contract',
  'compose_model','build_images','stack_health','runtime_smoke','aitec_runtime',
- 'rls_isolation','privacy_lgpd','municipality_factory','ai_retrieval',
+ 'rls_isolation','privacy_lgpd','municipality_factory','ai_retrieval','ai_redteam_runtime',
  'critical_fixture_seed','browser_critical','security_baseline','load_profile',
  'fault_injection','observability','backup','restore_dr',
 ]
@@ -28,8 +29,16 @@ for needle in ['ops/security/supply-chain.py','supply-chain.json','sbom.cdx.json
     assert needle in security, f'security baseline missing supply-chain evidence: {needle}'
 
 for needle in [
+ 'providerConfigured=false','retrieved_prompt_injection','high_risk_without_confirmed_rule',
+ 'cross_tenant_private_secret','write_tool_explicit_action',
+ 'LOCAL_DETERMINISTIC_AI_REDTEAM_NOT_INDEPENDENT_PENTEST_OR_PROVIDER_REDTEAM',
+]:
+    assert needle in redteam, f'AI runtime redteam missing contract: {needle}'
+
+for needle in [
  'production_parity','staging_parity','immutable_release','rollback_contract',
- 'playwright-results.json','k6-summary.json','security_baseline','supply_chain_inventory','cyclonedx_sbom','observability_gate',
+ 'playwright-results.json','k6-summary.json','security_baseline','ai_runtime_redteam','supply_chain_inventory','cyclonedx_sbom','observability_gate',
+ 'LOCAL_DETERMINISTIC_AI_REDTEAM_NOT_INDEPENDENT_PENTEST_OR_PROVIDER_REDTEAM','provider_specific_ai_redteam',
  'LOCAL_SUPPLY_CHAIN_INVENTORY_NOT_VULNERABILITY_SCAN','vulnerability_image_signature_scan',
  'dr_evidence','opensearch_health','ld-ai-b-leak.json',
  "'productionHomologated':False",
@@ -41,4 +50,4 @@ for needle in [
     assert needle in report, f'qualification report missing evidence/final gate: {needle}'
 
 assert 'productionHomologated remains false' in manifest
-print('v20 Cortex local + release/staging/supply-chain evidence report contract OK')
+print('v20 Cortex local + release/staging/supply-chain/AI-redteam evidence report contract OK')

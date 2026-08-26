@@ -11,6 +11,7 @@ import {RuralModule} from './rural/rural.module';
 import {CondoModule} from './condo/condo.module';
 import {SolarModule} from './solar/solar.module';
 import {MunicipalityModule} from './municipality/municipality.module';
+import {PrivacyModule} from './privacy/privacy.module';
 
-@Module({imports:[CoreModule,TerritorialModule,Property360Module,ReportModule,RuralModule,CondoModule,SolarModule,MunicipalityModule,DomainsModule,MetricsModule,ContractsModule,JobEventsModule]})
+@Module({imports:[CoreModule,TerritorialModule,Property360Module,ReportModule,RuralModule,CondoModule,SolarModule,MunicipalityModule,PrivacyModule,DomainsModule,MetricsModule,ContractsModule,JobEventsModule]})
 export class AppModule{}

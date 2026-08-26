@@ -50,7 +50,13 @@ run_trivy fs \
   /workspace
 
 if [[ "$SCAN_IMAGES" == "1" ]]; then
-  echo "==> Trivy locally built application images"
+  echo "==> Materialize Compose containers for deterministic image enumeration"
+  # `docker compose images` is container-oriented on some Compose versions. Create
+  # the topology without starting it so every resolved build/pull image can be
+  # enumerated before the normal `up -d` phase of the qualification harness.
+  docker compose create >/dev/null
+
+  echo "==> Trivy locally resolved Compose images"
   mapfile -t images < <(docker compose images --format json 2>/dev/null | python3 -c '
 import json,sys
 raw=sys.stdin.read().strip()

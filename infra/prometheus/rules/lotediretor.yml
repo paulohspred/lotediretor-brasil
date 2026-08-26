@@ -55,3 +55,59 @@ groups:
         annotations:
           summary: "HTTP p95 latency above 1.5s for {{ $labels.service }}"
           runbook: "docs/ops/RUNBOOKS.md#high-p95-latency"
+
+      - alert: LoteDiretorAitecWorkerDown
+        expr: up{job="aitec-worker"} == 0
+        for: 2m
+        labels: {severity: critical}
+        annotations:
+          summary: "A.I TEC durable job worker is not scrapeable"
+          runbook: "docs/ops/RUNBOOKS.md#a-i-tec-job-queue-or-worker-failure"
+
+      - alert: LoteDiretorAitecWorkerDbStale
+        expr: time() - lotediretor_aitec_worker_last_db_success_unixtime > 60
+        for: 2m
+        labels: {severity: critical}
+        annotations:
+          summary: "A.I TEC worker has not completed a database cycle for more than 60s"
+          runbook: "docs/ops/RUNBOOKS.md#a-i-tec-job-queue-or-worker-failure"
+
+      - alert: LoteDiretorAitecQueueBacklog
+        expr: lotediretor_aitec_jobs{status="QUEUED"} > 20
+        for: 10m
+        labels: {severity: warning}
+        annotations:
+          summary: "A.I TEC queue depth above 20 jobs for 10m"
+          runbook: "docs/ops/RUNBOOKS.md#a-i-tec-job-queue-or-worker-failure"
+
+      - alert: LoteDiretorAitecQueueStalled
+        expr: lotediretor_aitec_oldest_job_age_seconds{status="QUEUED"} > 120
+        for: 5m
+        labels: {severity: warning}
+        annotations:
+          summary: "Oldest queued A.I TEC job is older than 120s"
+          runbook: "docs/ops/RUNBOOKS.md#a-i-tec-job-queue-or-worker-failure"
+
+      - alert: LoteDiretorAitecQueueCriticallyStalled
+        expr: lotediretor_aitec_oldest_job_age_seconds{status="QUEUED"} > 600
+        for: 2m
+        labels: {severity: critical}
+        annotations:
+          summary: "Oldest queued A.I TEC job is older than 10 minutes"
+          runbook: "docs/ops/RUNBOOKS.md#a-i-tec-job-queue-or-worker-failure"
+
+      - alert: LoteDiretorAitecJobFailures
+        expr: increase(lotediretor_aitec_job_executions_total{result="failed"}[15m]) > 0
+        for: 1m
+        labels: {severity: warning}
+        annotations:
+          summary: "One or more A.I TEC jobs failed in the last 15m"
+          runbook: "docs/ops/RUNBOOKS.md#a-i-tec-job-queue-or-worker-failure"
+
+      - alert: LoteDiretorAitecRetryStorm
+        expr: increase(lotediretor_aitec_job_executions_total{result="retry"}[10m]) > 10
+        for: 2m
+        labels: {severity: warning}
+        annotations:
+          summary: "A.I TEC worker retried more than 10 executions in 10m"
+          runbook: "docs/ops/RUNBOOKS.md#a-i-tec-job-queue-or-worker-failure"

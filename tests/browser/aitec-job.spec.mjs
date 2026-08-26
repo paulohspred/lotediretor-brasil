@@ -31,6 +31,7 @@ async function pollJob(request,id,timeoutMs=90_000){
     if(last.status==='COMPLETED')return last;
     if(last.status==='FAILED'||last.status==='CANCELLED')throw new Error(`A.I TEC job terminal failure: ${JSON.stringify(last)}`);
     expect(['QUEUED','RUNNING']).toContain(last.status);
+    if(last.status==='QUEUED')expect(last.next_attempt_at).toBeTruthy();
     await new Promise(resolve=>setTimeout(resolve,1000));
   }
   throw new Error(`A.I TEC job did not complete within ${timeoutMs}ms; last=${JSON.stringify(last)}`);
@@ -76,6 +77,8 @@ test('critical journey: real OIDC -> A.I TEC project -> queued v20 job -> worker
   expect(queued.operation).toBe('terrain.tin');
   expect(queued.status).toBe('QUEUED');
   expect(queued.attempts).toBe(0);
+  expect(queued.next_attempt_at).toBeTruthy();
+  expect(Number.isNaN(Date.parse(queued.next_attempt_at))).toBe(false);
   expect(queued.execution_context.tenant_id).toBeTruthy();
   expect(queued.execution_context.project_id).toBe(project.id);
   expect(queued.execution_context.seed).toBe(42);
@@ -85,6 +88,7 @@ test('critical journey: real OIDC -> A.I TEC project -> queued v20 job -> worker
   }),'replay A.I TEC job');
   expect(replay.idempotency.replayed).toBe(true);
   expect(replay.id).toBe(queued.id);
+  expect(replay.next_attempt_at).toBe(queued.next_attempt_at);
 
   const completed=await pollJob(request,queued.id);
   expect(completed.id).toBe(queued.id);

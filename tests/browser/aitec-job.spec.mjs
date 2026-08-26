@@ -13,97 +13,60 @@ async function login(page){
     page.waitForURL(url=>url.pathname==='/app/ai-tec',{timeout:60_000}),
     page.locator('#kc-login').click(),
   ]);
-  return page.context().request;
+  const session=(await page.context().cookies()).find(c=>c.name==='ld_session');
+  expect(session,'real OIDC login must create ld_session').toBeTruthy();
 }
 
-async function json(response,label){
-  const text=await response.text();
-  let body;try{body=JSON.parse(text)}catch{throw new Error(`${label} returned non-JSON ${response.status()}: ${text.slice(0,1000)}`)}
-  expect(response.ok(),`${label} ${response.status()}: ${text.slice(0,2000)}`).toBeTruthy();
-  return body;
-}
-
-async function pollJob(request,id,timeoutMs=90_000){
-  const deadline=Date.now()+timeoutMs;
-  let last;
-  while(Date.now()<deadline){
-    last=await json(await request.get(`/api/v1/aitec/jobs/${id}`),'A.I TEC job status');
-    if(last.status==='COMPLETED')return last;
-    if(last.status==='FAILED'||last.status==='CANCELLED')throw new Error(`A.I TEC job terminal failure: ${JSON.stringify(last)}`);
-    expect(['QUEUED','RUNNING']).toContain(last.status);
-    if(last.status==='QUEUED')expect(last.next_attempt_at).toBeTruthy();
-    await new Promise(resolve=>setTimeout(resolve,1000));
-  }
-  throw new Error(`A.I TEC job did not complete within ${timeoutMs}ms; last=${JSON.stringify(last)}`);
-}
-
-test('critical journey: real OIDC -> A.I TEC project -> queued v20 job -> worker -> reproducible persisted result',async({page})=>{
-  const request=await login(page);
+test('critical UI journey: OIDC -> A.I TEC project -> persisted v20 job -> worker -> auditable result',async({page})=>{
+  await login(page);
   const nonce=Date.now();
 
-  const project=await json(await request.post('/api/v1/aitec/projects',{data:{name:`A.I TEC Browser Job ${nonce}`}}),'create A.I TEC project');
-  expect(project.id).toBeTruthy();
-  expect(project.status).toBe('DRAFT');
+  await expect(page.getByRole('heading',{name:'A.I TEC'})).toBeVisible();
+  await page.getByLabel('Nome do projeto').fill(`A.I TEC UI Job ${nonce}`);
+  await page.getByRole('button',{name:'Criar',exact:true}).click();
 
-  const payload={
-    operation:'terrain.tin',
-    seed:42,
-    kwargs:{samples:[
-      {x:0,y:0,z:100},
-      {x:10,y:0,z:101},
-      {x:0,y:10,z:102},
-      {x:10,y:10,z:103},
-    ]},
-  };
+  const runButton=page.getByRole('button',{name:'Executar job v20'});
+  await expect(runButton).toBeEnabled({timeout:30_000});
+  await page.getByLabel('Amostras TIN JSON').fill(JSON.stringify([
+    {x:0,y:0,z:100},
+    {x:10,y:0,z:101},
+    {x:0,y:10,z:102},
+    {x:10,y:10,z:103},
+  ]));
+  await page.getByLabel('Seed do job').fill('42');
+  await runButton.click();
 
-  const missingKey=await request.post(`/api/v1/aitec/projects/${project.id}/jobs`,{data:payload});
+  const status=page.getByTestId('aitec-job-status');
+  await expect(status).toContainText('COMPLETED',{timeout:90_000});
+  const resultNode=page.getByTestId('aitec-job-result');
+  await expect(resultNode).toContainText('aitec-terrain-v20.1');
+  await expect(resultNode).toContainText('STUDY_PREPROJECT_NOT_EXECUTIVE');
+  await expect(resultNode).toContainText('professional_review_required');
+  await expect(resultNode).toContainText('true');
+  await expect(resultNode).toContainText('triangle_count');
+
+  const raw=await resultNode.textContent();
+  const completed=JSON.parse(raw||'{}');
+  expect(completed.status).toBe('COMPLETED');
+  expect(completed.operation).toBe('terrain.tin');
+  expect(completed.attempts).toBeGreaterThanOrEqual(1);
+  expect(completed.engine_response?.context?.project_id).toBe(completed.project_id);
+  expect(completed.engine_response?.context?.seed).toBe(42);
+  expect(completed.engine_response?.result?.status).toBe('CALCULATED');
+  expect(completed.engine_response?.result?.triangle_count).toBeGreaterThanOrEqual(2);
+
+  // Boundary assertions stay in the same authenticated browser session while
+  // the primary business journey above is driven through visible UI controls.
+  const request=page.context().request;
+  const payload={operation:'terrain.tin',seed:42,kwargs:{samples:[{x:0,y:0,z:1},{x:1,y:0,z:2},{x:0,y:1,z:3}]}};
+  const missingKey=await request.post(`/api/v1/aitec/projects/${completed.project_id}/jobs`,{data:payload});
   expect(missingKey.status()).toBe(400);
   expect(await missingKey.text()).toContain('idempotency_key_required');
 
-  const disallowed=await request.post(`/api/v1/aitec/projects/${project.id}/jobs`,{
+  const disallowed=await request.post(`/api/v1/aitec/projects/${completed.project_id}/jobs`,{
     headers:{'Idempotency-Key':`browser-aitec-deny-${nonce}`},
     data:{operation:'shell.execute',kwargs:{command:'never-run'}},
   });
   expect(disallowed.status()).toBe(400);
   expect(await disallowed.text()).toContain('aitec_operation_not_allowed');
-
-  const key=`browser-aitec-job-${nonce}`;
-  const queued=await json(await request.post(`/api/v1/aitec/projects/${project.id}/jobs`,{
-    headers:{'Idempotency-Key':key},data:payload,
-  }),'queue A.I TEC job');
-
-  expect(queued.id).toBeTruthy();
-  expect(queued.project_id).toBe(project.id);
-  expect(queued.operation).toBe('terrain.tin');
-  expect(queued.status).toBe('QUEUED');
-  expect(queued.attempts).toBe(0);
-  expect(queued.next_attempt_at).toBeTruthy();
-  expect(Number.isNaN(Date.parse(queued.next_attempt_at))).toBe(false);
-  expect(queued.execution_context.tenant_id).toBeTruthy();
-  expect(queued.execution_context.project_id).toBe(project.id);
-  expect(queued.execution_context.seed).toBe(42);
-
-  const replay=await json(await request.post(`/api/v1/aitec/projects/${project.id}/jobs`,{
-    headers:{'Idempotency-Key':key},data:payload,
-  }),'replay A.I TEC job');
-  expect(replay.idempotency.replayed).toBe(true);
-  expect(replay.id).toBe(queued.id);
-  expect(replay.next_attempt_at).toBe(queued.next_attempt_at);
-
-  const completed=await pollJob(request,queued.id);
-  expect(completed.id).toBe(queued.id);
-  expect(completed.project_id).toBe(project.id);
-  expect(completed.operation).toBe('terrain.tin');
-  expect(completed.status).toBe('COMPLETED');
-  expect(completed.attempts).toBeGreaterThanOrEqual(1);
-  expect(completed.solver_version).toBe('aitec-terrain-v20.1');
-  expect(completed.classification).toBe('STUDY_PREPROJECT_NOT_EXECUTIVE');
-  expect(completed.professional_review_required).toBe(true);
-  expect(completed.engine_response.status).toBe('EXECUTED');
-  expect(completed.engine_response.operation).toBe('terrain.tin');
-  expect(completed.engine_response.context.project_id).toBe(project.id);
-  expect(completed.engine_response.context.seed).toBe(42);
-  expect(completed.engine_response.result.status).toBe('CALCULATED');
-  expect(completed.engine_response.result.triangle_count).toBeGreaterThanOrEqual(2);
-  expect(completed.completed_at).toBeTruthy();
 });

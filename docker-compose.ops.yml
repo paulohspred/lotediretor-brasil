@@ -11,3 +11,9 @@ services:
   aitec-engine:
     environment:
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+  blackbox-exporter:
+    profiles: [ops]
+    image: prom/blackbox-exporter:v0.27.0
+    command: ["--config.file=/etc/blackbox_exporter/config.yml"]
+    volumes:
+      - ./infra/prometheus/blackbox.yml:/etc/blackbox_exporter/config.yml:ro

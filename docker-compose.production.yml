@@ -27,7 +27,7 @@ services:
     environment:
       MINIO_ROOT_USER: ${S3_ACCESS_KEY:?required}
       MINIO_ROOT_PASSWORD: ${S3_SECRET_KEY:?required}
-    ports: []
+    ports: !reset []
   keycloak:
     command:
     - start
@@ -41,7 +41,7 @@ services:
       KC_METRICS_ENABLED: 'true'
       KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN:?required}
       KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?required}
-    ports: []
+    ports: !reset []
     volumes:
     - ./infra/keycloak/generated/realm-lotediretor.production.json:/opt/keycloak/data/import/realm-lotediretor.json:ro
     - ./infra/keycloak/themes/lotediretor:/opt/keycloak/themes/lotediretor:ro
@@ -96,7 +96,7 @@ services:
       APP_ENV: production
       INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN:?required}
   gateway:
-    ports:
+    ports: !override
     - 80:80
     - 443:443
     environment:
@@ -111,11 +111,11 @@ services:
     # Search remains internal to the Compose network. Publishing 9200 on the
     # production host would bypass the gateway and the application ACL/tenant
     # boundary even when the Docker network itself is private.
-    ports: []
+    ports: !reset []
   prometheus:
-    ports: []
+    ports: !reset []
   grafana:
-    ports: []
+    ports: !reset []
   event-dispatcher:
     environment:
       PLATFORM_EVENT_DATABASE_URL: postgresql://lotediretor_event_dispatcher:${PLATFORM_DB_EVENT_PASSWORD:?required}@platform-db:5432/${PLATFORM_DB_NAME:?required}

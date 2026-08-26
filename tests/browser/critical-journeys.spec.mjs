@@ -1,13 +1,18 @@
 import {test,expect} from '@playwright/test';
 
 const USER='cliente@lotediretor.local';
+const ADMIN='admin@lotediretor.local';
 const PASSWORD='lotediretor';
+const LOCAL_CONTROL_TENANT='0198f101-0000-7000-8000-000000000001';
+const BILLING_PAYMENT_FIXTURE='0198f231-0000-7000-8000-000000000001';
 
-async function oidcLogin(page,returnTo='/app/dashboard'){
+test.describe.configure({mode:'serial'});
+
+async function oidcLogin(page,{returnTo='/app/dashboard',user=USER}={}){
   await page.goto(returnTo,{waitUntil:'domcontentloaded'});
   await expect(page).toHaveURL(/\/login\?returnTo=/);
   await page.getByRole('link',{name:'Entrar com conta LoteDiretor'}).click();
-  await page.locator('#username').fill(USER);
+  await page.locator('#username').fill(user);
   await page.locator('#password').fill(PASSWORD);
   await Promise.all([
     page.waitForURL(url=>url.pathname===returnTo,{timeout:60_000}),
@@ -102,4 +107,52 @@ test('critical journey: real OIDC -> parcel analysis -> evidence -> generated re
   expect(manifest.artifacts.some(a=>a.content_type==='application/pdf')).toBe(true);
   expect(manifest.artifacts.some(a=>a.content_type==='application/json')).toBe(true);
   expect(manifest.sections.every(s=>['CONFIRMED','CALCULATED','INFERRED','PENDING','CONFLICTING','NOT_AVAILABLE'].includes(s.status))).toBe(true);
+});
+
+test('critical journey: billing settlement -> paid invoice -> platform entitlement snapshot',async({page})=>{
+  const request=await oidcLogin(page,{returnTo:'/admin/dashboard',user:ADMIN});
+
+  const plans=await json(await request.get('/control/v1/catalog/plans'),'plans');
+  const foundation=plans.items.find(p=>p.code==='foundation'&&p.status==='ACTIVE');
+  expect(foundation,'active foundation plan fixture').toBeTruthy();
+
+  const subscription=await json(await request.post('/control/v20/billing/subscriptions',{
+    headers:{'Idempotency-Key':'browser-billing-subscription-v20'},
+    data:{tenantId:LOCAL_CONTROL_TENANT,planVersionId:foundation.id,status:'ACTIVE',provider:'E2E_FIXTURE',providerSubscriptionId:'browser-subscription-001',reason:'critical browser journey'},
+  }),'subscription');
+  expect(subscription.id).toBeTruthy();
+  expect(subscription.status).toBe('ACTIVE');
+
+  const invoice=await json(await request.post('/control/v20/billing/invoices',{
+    headers:{'Idempotency-Key':'browser-billing-invoice-v20'},
+    data:{
+      tenantId:LOCAL_CONTROL_TENANT,subscriptionId:subscription.id,invoiceNumber:'E2E-BROWSER-ENTITLEMENT-001',
+      lines:[{lineType:'PLAN',description:'Foundation E2E entitlement proof',quantity:1,unitCents:12345}],
+      metadata:{synthetic:true,purpose:'billing_to_entitlement_browser_e2e'},reason:'critical browser journey',
+    },
+  }),'invoice');
+  expect(invoice.id).toBeTruthy();
+  expect(invoice.status).toBe('OPEN');
+  expect(Number(invoice.total_cents)).toBe(12345);
+
+  const allocation=await json(await request.post(`/control/v20/billing/payments/${BILLING_PAYMENT_FIXTURE}/allocate`,{
+    headers:{'Idempotency-Key':'browser-billing-allocation-v20'},
+    data:{tenantId:LOCAL_CONTROL_TENANT,invoiceId:invoice.id,amountCents:12345,reason:'synthetic settled payment allocation'},
+  }),'payment allocation');
+  expect(allocation.invoice.status).toBe('PAID');
+  expect(Number(allocation.invoice.paid_cents)).toBe(12345);
+
+  const applied=await json(await request.post(`/control/v20/billing/invoices/${invoice.id}/apply-entitlements`),'apply entitlements');
+  expect(applied.status).toBe('APPLIED_FROM_PAID_INVOICE');
+  expect(applied.platform.status).toBe('SYNCHRONIZED');
+  expect(applied.platform.snapshot.tier).toBe('foundation');
+  expect(applied.platform.snapshot.billing.invoiceId).toBe(invoice.id);
+  expect(applied.platform.snapshot.billing.subscriptionId).toBe(subscription.id);
+  expect(applied.platform.snapshot.modules).toContain('imovel360');
+  expect(applied.platform.snapshot.modules).toContain('condominio');
+  expect(applied.platform.sessionsUpdated).toBeGreaterThan(0);
+
+  const me=await json(await request.get('/api/v1/auth/me'),'auth me after entitlement sync');
+  expect(me.entitlements.billing.invoiceId).toBe(invoice.id);
+  expect(me.entitlements.tier).toBe('foundation');
 });

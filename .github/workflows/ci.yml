@@ -53,6 +53,8 @@ jobs:
         run: docker run --rm --entrypoint /bin/promtool -v "$PWD/infra/prometheus:/etc/prometheus:ro" prom/prometheus:v3.5.0 check config /etc/prometheus/prometheus.yml
       - name: Validate rendered production parity
         run: python3 ops/security/production-parity.py
+      - name: Validate immutable staging candidate equivalence
+        run: python3 ops/staging/production-equivalence.py
       - name: Validate immutable release promotion model
         run: python3 ops/release/immutable-release.py
       - name: Validate rollback contract and candidate/previous digest comparison

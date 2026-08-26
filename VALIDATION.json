@@ -1,10 +1,10 @@
 {
   "version": "v20-development",
   "runtimeVersion": "19.0.0-rc.3",
-  "baselineCommit": "8802b27878d0a745dcc9290a4de2ae564265964b",
-  "validatedAtUtc": "2026-08-25T12:36:00Z",
-  "staticValidation": "PASS",
-  "runtimeValidation": "PASS_LOCAL_REPRODUCIBLE_GATE",
+  "baselineCommit": "42ac9a13ccb726f68e48a62be75e7d5bec1ffaa7",
+  "validatedAtUtc": "2026-08-26T10:28:03Z",
+  "staticValidation": "PASS_CI_456",
+  "runtimeValidation": "PASS_RUNTIME_E2E_60",
   "productionHomologated": false,
   "proven": [
     "clean npm ci in GitHub Actions",
@@ -16,32 +16,43 @@
     "service health and routed smoke tests",
     "live PostgreSQL/PostGIS migrations",
     "non-owner cross-tenant PostgreSQL RLS isolation",
+    "Municipality Factory DB activation/homologation guards and tenant isolation",
     "real OpenSearch cluster health and evidence index bootstrap",
-    "real ai-ingest lexical indexing and retrieval isolation through gateway/Caddy",
+    "ai-ingest search-readiness contract waits for refresh before indexed_at",
+    "real ai-ingest lexical indexing and retrieval through gateway/Caddy",
+    "runtime tenant A private evidence retrieval with tenant B exclusion",
+    "runtime municipal public evidence included only with explicit public scope",
+    "runtime future-valid rule excluded for a 2026 baseDate",
+    "A.I TEC v20 advanced runtime API",
     "backup and restore drill in the same clean runtime gate",
     "evidence index schema evidence-v20.1 and embedding-space fingerprint lifecycle",
     "explicit refusal of incompatible vector index plus controlled rebuild/requeue tooling",
     "synthetic reranker golden evaluation with Recall@K, MRR and NDCG",
-    "PR #34 ci 32839748000 PASS and runtime-e2e 32839747999 PASS",
-    "PR #43 ci 32840808815 PASS and runtime-e2e 32840808863 PASS"
+    "PR #66 merge 42ac9a13ccb726f68e48a62be75e7d5bec1ffaa7 after CI #456 PASS and runtime-e2e #60 PASS"
   ],
   "notHomologated": [
     "external embedding/chat/model provider quality, credentials, cost and fallback behavior",
-    "São Paulo live WFS ingestion/domain promotion and 10-20 human/professional golden lots",
+    "São Paulo live WFS/source ingestion, domain promotion and 10-20 human/professional golden lots",
     "other official/licensed live sources and license/provenance coverage",
     "browser E2E/mobile/accessibility",
-    "production-like staging, DNS/TLS/secrets/cloud IAM",
+    "production-like staging, Infrastructure as Code, DNS/TLS/secrets/cloud IAM",
     "operational observability, SLOs, alerts and runbooks",
-    "pentest/red-team/load/soak/canary/rollback",
-    "production backup/restore and HA/DR with RPO/RTO",
-    "professional legal/engineering/architecture review",
+    "independent pentest and operational red-team",
+    "load/soak/capacity by service and queue",
+    "production canary/rollback evidence",
+    "production backup/restore and HA/DR with measured RPO/RTO",
+    "LGPD retention/deletion/export operational evidence",
+    "professional legal/engineering/architecture/fiscal review",
     "main branch protection"
   ],
   "observedAdministrativeBlockers": [
-    "main branch returned protected=false on 2026-08-25; available connector does not expose branch-protection write action"
+    "main branch returned protected=false on 2026-08-26; available connector does not expose an approved branch-protection write action"
   ],
   "fullLegacyValidator": "./validate-v19-rc3.sh",
   "v20Validation": "incremental validators in .github/workflows/ci.yml",
   "runtimeWorkflow": ".github/workflows/runtime-e2e.yml",
+  "latestPassingCiRun": 456,
+  "latestPassingRuntimeRun": 60,
+  "latestRuntimeArtifactId": 9602867789,
   "acceptanceMatrix": "docs/V20_ACCEPTANCE_MATRIX.md"
 }

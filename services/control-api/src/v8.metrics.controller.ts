@@ -1,5 +1,6 @@
 import {Controller,Get,Res} from '@nestjs/common';
 import {Pool} from 'pg';
+import {renderHttpMetrics} from './telemetry';
 
 const pool=new Pool({connectionString:process.env.CONTROL_DATABASE_URL});
 const started=Date.now();
@@ -21,6 +22,7 @@ export class ControlMetricsController{
       '# HELP lotediretor_build_info Static build information.',
       '# TYPE lotediretor_build_info gauge',
       'lotediretor_build_info{service="control-api",version="19.0.0-rc.3"} 1',
+      renderHttpMetrics('control-api'),
       ''
     ].join('\n');
     return res.header('content-type','text/plain; version=0.0.4; charset=utf-8').send(body);

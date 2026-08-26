@@ -64,8 +64,8 @@ export class EntitlementSyncController{
       if(!org.rowCount||org.rows[0].status!=='ACTIVE')throw new HttpException('active_organization_required',409);
       const known=(await c.query(`select code from core.module where code=any($1::text[])`,[snapshot.modules])).rows.map((x:any)=>String(x.code));
       if(known.length!==snapshot.modules.length)throw new HttpException('unknown_entitlement_module',409);
-      const current=await c.query(`select id,snapshot from core.entitlement_snapshot where organization_id=$1 and valid_from<=now() and (valid_to is null or valid_to>now()) order by valid_from desc limit 1 for update`,[organizationId]);
-      if(current.rowCount&&JSON.stringify(current.rows[0].snapshot)===JSON.stringify(snapshot)){
+      const current=await c.query(`select id,snapshot,(snapshot=$2::jsonb) same from core.entitlement_snapshot where organization_id=$1 and valid_from<=now() and (valid_to is null or valid_to>now()) order by valid_from desc limit 1 for update`,[organizationId,JSON.stringify(snapshot)]);
+      if(current.rowCount&&current.rows[0].same){
         id=current.rows[0].id;replayed=true;
       }else{
         await c.query(`update core.entitlement_snapshot set valid_to=now() where organization_id=$1 and valid_to is null`,[organizationId]);

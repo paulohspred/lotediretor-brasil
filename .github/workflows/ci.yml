@@ -35,6 +35,7 @@ jobs:
           python tests/test_v20_cortex_qualification.py
           python tests/test_v20_supply_chain.py
           python tests/test_v20_critical_ui_contract.py
+          python tests/test_v20_release_signature_contract.py
           node tests/test_v20_ai_runtime.js
           node tests/test_v20_ai_retrieval_context.js
           node tests/test_v20_ai_provenance_ids.js
@@ -70,6 +71,8 @@ jobs:
         run: python3 ops/release/immutable-release.py
       - name: Validate rollback contract and candidate/previous digest comparison
         run: bash ops/release/rollback-drill.sh --self-test
+      - name: Validate release signature and SLSA provenance contract
+        run: bash ops/release/verify-signatures.sh --self-test
       - name: Validate production compose
         run: |
           docker compose -f docker-compose.yml -f docker-compose.production.yml --profile full --profile ops config >/dev/null

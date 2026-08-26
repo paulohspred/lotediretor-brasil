@@ -8,6 +8,7 @@ import urllib.request
 from dataclasses import dataclass
 
 import psycopg
+from prometheus_client import Counter, Gauge, Histogram, start_http_server
 from psycopg.types.json import Jsonb
 
 DB = os.environ['PLATFORM_DATABASE_URL']
@@ -18,6 +19,23 @@ TIMEOUT_SECONDS = max(5.0, float(os.getenv('AITEC_JOB_TIMEOUT_SECONDS', '180')))
 MAX_ATTEMPTS = max(1, int(os.getenv('AITEC_JOB_MAX_ATTEMPTS', '3')))
 STALE_SECONDS = max(60, int(os.getenv('AITEC_JOB_STALE_SECONDS', '600')))
 MAX_RESPONSE_BYTES = max(1024, int(os.getenv('AITEC_JOB_MAX_RESPONSE_BYTES', str(32 * 1024 * 1024))))
+METRICS_PORT = max(1, int(os.getenv('AITEC_METRICS_PORT', '9104')))
+METRICS_REFRESH_SECONDS = max(1.0, float(os.getenv('AITEC_METRICS_REFRESH_SECONDS', '5')))
+
+JOB_STATES = ('QUEUED', 'RUNNING', 'COMPLETED', 'FAILED', 'CANCELLED')
+JOB_STATE = Gauge('lotediretor_aitec_jobs', 'Persisted A.I TEC jobs by status.', ['status'])
+OLDEST_JOB_AGE = Gauge('lotediretor_aitec_oldest_job_age_seconds', 'Age in seconds of the oldest A.I TEC job in each status.', ['status'])
+JOB_EXECUTIONS = Counter('lotediretor_aitec_job_executions_total', 'A.I TEC worker execution outcomes.', ['result'])
+STALE_RECLAIMS = Counter('lotediretor_aitec_job_stale_reclaims_total', 'Stale RUNNING A.I TEC jobs reclaimed by the worker.', ['result'])
+ENGINE_DURATION = Histogram(
+    'lotediretor_aitec_engine_duration_seconds',
+    'Time spent waiting for an A.I TEC engine execution.',
+    buckets=(0.05, 0.1, 0.25, 0.5, 1, 2, 5, 10, 30, 60, 120, 180),
+)
+WORKER_LOOP_ERRORS = Counter('lotediretor_aitec_worker_loop_errors_total', 'Unhandled A.I TEC worker loop errors.')
+LAST_DB_SUCCESS = Gauge('lotediretor_aitec_worker_last_db_success_unixtime', 'Unix timestamp of the last successful A.I TEC worker database cycle.')
+WORKER_READY = Gauge('lotediretor_aitec_worker_ready', '1 after the A.I TEC worker metrics server has started.')
+_last_metrics_refresh = 0.0
 
 
 @dataclass
@@ -29,16 +47,43 @@ class EngineFailure(Exception):
         return self.message
 
 
+def refresh_queue_metrics(conn: psycopg.Connection, force: bool = False) -> None:
+    global _last_metrics_refresh
+    now = time.monotonic()
+    if not force and now - _last_metrics_refresh < METRICS_REFRESH_SECONDS:
+        return
+    rows = conn.execute(
+        """select status,count(*)::int,
+                  coalesce(max(extract(epoch from (now()-case when status='RUNNING' then coalesce(started_at,created_at) else created_at end))),0)::double precision
+             from aitec.job
+            where status in ('QUEUED','RUNNING','COMPLETED','FAILED','CANCELLED')
+            group by status"""
+    ).fetchall()
+    counts = {status: (0, 0.0) for status in JOB_STATES}
+    for status, count, oldest_age in rows:
+        counts[str(status)] = (int(count), max(0.0, float(oldest_age or 0.0)))
+    for status, (count, oldest_age) in counts.items():
+        JOB_STATE.labels(status=status).set(count)
+        OLDEST_JOB_AGE.labels(status=status).set(oldest_age)
+    LAST_DB_SUCCESS.set(time.time())
+    _last_metrics_refresh = now
+
+
 def reclaim_stale(conn: psycopg.Connection) -> None:
     with conn.transaction():
-        conn.execute(
+        rows = conn.execute(
             """update aitec.job
                set status=case when attempts >= %s then 'FAILED' else 'QUEUED' end,
                    error=case when attempts >= %s then coalesce(error,'worker_stale_after_max_attempts') else 'worker_stale_requeued' end,
                    completed_at=case when attempts >= %s then now() else null end
-               where status='RUNNING' and started_at < now()-(%s||' seconds')::interval""",
+               where status='RUNNING' and started_at < now()-(%s||' seconds')::interval
+               returning status""",
             (MAX_ATTEMPTS, MAX_ATTEMPTS, MAX_ATTEMPTS, str(STALE_SECONDS)),
-        )
+        ).fetchall()
+    for (status,) in rows:
+        STALE_RECLAIMS.labels(result='failed' if status == 'FAILED' else 'requeued').inc()
+    if rows:
+        refresh_queue_metrics(conn, force=True)
 
 
 def claim(conn: psycopg.Connection):
@@ -147,9 +192,10 @@ def complete(conn: psycopg.Connection, job: dict, response: dict) -> None:
                 }),
             ),
         )
+    JOB_EXECUTIONS.labels(result='completed').inc()
 
 
-def fail(conn: psycopg.Connection, job: dict, error: EngineFailure) -> None:
+def fail(conn: psycopg.Connection, job: dict, error: EngineFailure) -> bool:
     terminal = (not error.retryable) or job['attempts'] >= MAX_ATTEMPTS
     with conn.transaction():
         conn.execute(
@@ -170,35 +216,50 @@ def fail(conn: psycopg.Connection, job: dict, error: EngineFailure) -> None:
                     Jsonb({'jobId': job['id'], 'projectId': job['project_id'], 'operation': job['operation'], 'error': str(error)[:1000]}),
                 ),
             )
+    JOB_EXECUTIONS.labels(result='failed' if terminal else 'retry').inc()
+    return terminal
 
 
 def process_one() -> bool:
     with psycopg.connect(DB) as conn:
         reclaim_stale(conn)
+        refresh_queue_metrics(conn)
         job = claim(conn)
         if not job:
+            LAST_DB_SUCCESS.set(time.time())
             return False
         try:
-            response = execute_engine(job)
+            with ENGINE_DURATION.time():
+                response = execute_engine(job)
             complete(conn, job, response)
+            refresh_queue_metrics(conn, force=True)
             print(f"aitec job completed id={job['id']} operation={job['operation']} solver={response.get('solver_version')}", flush=True)
         except EngineFailure as exc:
-            fail(conn, job, exc)
-            print(f"aitec job {'retry' if exc.retryable and job['attempts'] < MAX_ATTEMPTS else 'failed'} id={job['id']} error={exc}", flush=True)
+            terminal = fail(conn, job, exc)
+            refresh_queue_metrics(conn, force=True)
+            print(f"aitec job {'failed' if terminal else 'retry'} id={job['id']} error={exc}", flush=True)
         except Exception as exc:
             failure = EngineFailure(f'aitec_worker_internal_error:{type(exc).__name__}:{exc}', True)
-            fail(conn, job, failure)
-            print(f"aitec worker internal error id={job['id']} error={exc!r}", flush=True)
+            terminal = fail(conn, job, failure)
+            refresh_queue_metrics(conn, force=True)
+            print(f"aitec worker internal error id={job['id']} terminal={terminal} error={exc!r}", flush=True)
+    LAST_DB_SUCCESS.set(time.time())
     return True
 
 
 def main() -> None:
-    print(f'aitec-worker engine={ENGINE} max_attempts={MAX_ATTEMPTS} stale_seconds={STALE_SECONDS}', flush=True)
+    start_http_server(METRICS_PORT, addr='0.0.0.0')
+    WORKER_READY.set(1)
+    print(
+        f'aitec-worker engine={ENGINE} max_attempts={MAX_ATTEMPTS} stale_seconds={STALE_SECONDS} metrics_port={METRICS_PORT}',
+        flush=True,
+    )
     while True:
         try:
             if not process_one():
                 time.sleep(POLL_SECONDS)
         except Exception as exc:
+            WORKER_LOOP_ERRORS.inc()
             print(f'aitec worker loop error {exc!r}', flush=True)
             time.sleep(max(2.0, POLL_SECONDS))
 

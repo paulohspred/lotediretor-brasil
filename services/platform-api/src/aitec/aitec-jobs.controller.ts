@@ -64,7 +64,7 @@ export class AitecJobsController{
       if(seed!==null)context.seed=seed;
       const r=await c.query(`insert into aitec.job(tenant_id,project_id,constraint_snapshot_id,operation,args,kwargs,execution_context,status,created_by)
         values($1,$2,$3,$4,$5::jsonb,$6::jsonb,$7::jsonb,'QUEUED',$8)
-        returning id,project_id,constraint_snapshot_id,operation,status,attempts,execution_context,created_at`,[
+        returning id,project_id,constraint_snapshot_id,operation,status,attempts,execution_context,next_attempt_at,created_at`,[
         s.organizationId,projectId,constraintSnapshotId,operation,JSON.stringify(args),JSON.stringify(kwargs),JSON.stringify(context),s.email||s.id,
       ]);
       const job=r.rows[0];
@@ -78,7 +78,7 @@ export class AitecJobsController{
   async get(@Req() req:any,@Param('jobId') jobId:string){
     const s=await this.session(req);
     return tenantTx(pool,s.organizationId,async c=>{
-      const r=await c.query(`select j.id,j.project_id,j.constraint_snapshot_id,j.operation,j.status,j.attempts,j.execution_context,j.solver_version,j.classification,j.professional_review_required,j.engine_response,j.error,j.created_by,j.created_at,j.started_at,j.completed_at,p.name project_name
+      const r=await c.query(`select j.id,j.project_id,j.constraint_snapshot_id,j.operation,j.status,j.attempts,j.execution_context,j.solver_version,j.classification,j.professional_review_required,j.engine_response,j.error,j.created_by,j.created_at,j.next_attempt_at,j.started_at,j.completed_at,p.name project_name
         from aitec.job j join aitec.project p on p.id=j.project_id and p.tenant_id=j.tenant_id
         where j.id=$1 and j.tenant_id=$2`,[jobId,s.organizationId]);
       if(!r.rowCount)throw new HttpException('aitec_job_not_found',404);

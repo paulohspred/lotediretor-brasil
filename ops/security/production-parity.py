@@ -57,7 +57,6 @@ def port_targets(name):
         else: out.append((str(p),str(p),''))
     return out
 
-# Only the edge gateway may publish host ports in the production model.
 for name in services:
     ports=port_targets(name)
     if name=='gateway':
@@ -81,7 +80,6 @@ if control.get('CONTROL_MIGRATION_DATABASE_URL','')!='': errors.append('control-
 if 'ld_platform_app:' not in platform.get('PLATFORM_DATABASE_URL',''): errors.append('platform-api does not use app DB role')
 if 'ld_control_app:' not in control.get('CONTROL_DATABASE_URL',''): errors.append('control-api does not use app DB role')
 
-# Dedicated one-shot jobs must keep the owner DSNs, otherwise migrations cannot be separated from runtime.
 if 'ld_platform_migration:' not in envmap('platform-migrate').get('PLATFORM_MIGRATION_DATABASE_URL',''): errors.append('platform-migrate missing migration role')
 if 'ld_control_migration:' not in envmap('control-migrate').get('CONTROL_MIGRATION_DATABASE_URL',''): errors.append('control-migrate missing migration role')
 
@@ -91,15 +89,13 @@ kenv=envmap('keycloak')
 if kenv.get('KC_HOSTNAME_STRICT')!='true': errors.append('keycloak hostname strict disabled')
 if kenv.get('KC_HEALTH_ENABLED')!='true' or kenv.get('KC_METRICS_ENABLED')!='true': errors.append('keycloak health/metrics disabled')
 
-# Search must remain internal. OpenSearch transport auth/TLS is an independent hardening concern;
-# this gate ensures the application ACL cannot be bypassed directly from the host network.
 if port_targets('opensearch'): errors.append('opensearch exposed on host')
 
-# Runtime workers must use worker/event roles instead of owner/migration roles.
 worker_expectations={
  'geo-worker':('PLATFORM_DATABASE_URL','lotediretor_worker:'),
  'document-worker':('PLATFORM_DATABASE_URL','lotediretor_worker:'),
  'report-worker':('PLATFORM_DATABASE_URL','lotediretor_worker:'),
+ 'aitec-worker':('PLATFORM_DATABASE_URL','lotediretor_worker:'),
  'data-pipelines':('PLATFORM_DATABASE_URL','lotediretor_worker:'),
  'ai-ingest':('PLATFORM_DATABASE_URL','lotediretor_worker:'),
  'event-dispatcher':('PLATFORM_EVENT_DATABASE_URL','lotediretor_event_dispatcher:'),
@@ -108,7 +104,6 @@ worker_expectations={
 for name,(key,needle) in worker_expectations.items():
     if needle not in envmap(name).get(key,''): errors.append(f'{name} does not use least-privilege role in {key}')
 
-# Known development credential markers must not survive the rendered production model.
 serialized=json.dumps(model,sort_keys=True)
 for marker in ['change-me','lotediretor_local','local-lotediretor-secret','local-internal-change-me']:
     if marker in serialized: errors.append(f'development marker leaked into production model:{marker}')

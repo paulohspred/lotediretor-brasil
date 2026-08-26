@@ -2,11 +2,28 @@ import {Body,Controller,Get,HttpException,Param,Post,Req} from '@nestjs/common';
 import {Pool} from 'pg';
 import {AuthService} from '../auth.service';
 import {withIdempotency} from '../common/idempotency';
+import {enqueueOutbox} from '../common/outbox';
 import {tenantTx} from '../common/tenant-db';
 
 const pool=new Pool({connectionString:process.env.PLATFORM_DATABASE_URL});
 
 type Session={id?:string;email?:string;roles?:string[];organizationId:string;entitlements?:{modules?:string[]}};
+
+export const AITEC_JOB_OPERATIONS=new Set([
+  'unit.solve','unit.compare',
+  'terrain.tin','terrain.contours','terrain.plateaus','terrain.cut-fill',
+  'building.solve','parking.basement','unit.room-graph','road.evaluate','environment.analyze','finance.calculate',
+  'export.geojson','export.kml','export.kmz','export.dxf','export.ifc','export.xlsx','export.pdf','export.gltf','export.manifest',
+  'ingest.dataset','ingest.geojson','ingest.kml','ingest.kmz','ingest.shapefile','ingest.gpkg','ingest.dxf','ingest.ifc',
+  'optimization.pareto','optimization.diff',
+]);
+
+function plainObject(value:any){return value&&typeof value==='object'&&!Array.isArray(value)?value:{};}
+function boundedPayload(args:any[],kwargs:any){
+  let raw:string;
+  try{raw=JSON.stringify({args,kwargs});}catch{throw new HttpException('aitec_job_payload_not_json',400);}
+  if(Buffer.byteLength(raw,'utf8')>1024*1024)throw new HttpException('aitec_job_payload_too_large',413);
+}
 
 @Controller('api/v1/aitec')
 export class AitecJobsController{
@@ -23,63 +40,47 @@ export class AitecJobsController{
   @Post('projects/:projectId/jobs')
   async create(@Req() req:any,@Param('projectId') projectId:string,@Body() body:any){
     const s=await this.session(req);
+    const key=String(req.headers?.['idempotency-key']||'').trim();
+    if(!key)throw new HttpException('idempotency_key_required',400);
     const operation=String(body?.operation||'').trim();
-    if(!operation||!/^[a-z0-9.-]{3,80}$/i.test(operation))throw new HttpException('operation inválida',400);
+    if(!AITEC_JOB_OPERATIONS.has(operation))throw new HttpException('aitec_operation_not_allowed',400);
     const args=Array.isArray(body?.args)?body.args:[];
-    const kwargs=body?.kwargs&&typeof body.kwargs==='object'&&!Array.isArray(body.kwargs)?body.kwargs:{};
-    const seed=body?.seed==null?null:Number(body.seed);
-    if(seed!=null&&(!Number.isInteger(seed)||seed<0||seed>2147483647))throw new HttpException('seed inválido',400);
+    const kwargs=plainObject(body?.kwargs);
+    boundedPayload(args,kwargs);
     const constraintSnapshotId=body?.constraintSnapshotId?String(body.constraintSnapshotId):null;
-    const key=String(req.headers?.['idempotency-key']||'').trim()||undefined;
-
-    const project=await tenantTx(pool,s.organizationId,async c=>{
-      const r=await c.query(`select id,name,status from aitec.project where id=$1 and tenant_id=$2`,[projectId,s.organizationId]);
-      if(!r.rowCount)throw new HttpException('aitec_project_not_found',404);
-      if(constraintSnapshotId){
-        const cs=await c.query(`select id from aitec.constraint_snapshot where id=$1 and project_id=$2 and tenant_id=$3`,[constraintSnapshotId,projectId,s.organizationId]);
-        if(!cs.rowCount)throw new HttpException('constraint_snapshot_not_found',404);
-      }
-      return r.rows[0];
-    });
+    const seedRaw=body?.seed;
+    const seed=seedRaw==null?null:Number(seedRaw);
+    if(seed!==null&&(!Number.isInteger(seed)||seed<0||seed>2147483647))throw new HttpException('seed_invalid',400);
 
     const idem=await withIdempotency(pool,s.organizationId,'aitec.v20.job',key,async c=>{
-      const queued=await c.query(`insert into aitec.scenario(tenant_id,project_id,constraint_snapshot_id,solver_version,status,metrics)
-        values($1,$2,$3,null,'QUEUED',$4::jsonb) returning id,project_id,constraint_snapshot_id,status,created_at`,[
-        s.organizationId,projectId,constraintSnapshotId,JSON.stringify({operation,args,kwargs,seed,classification:'STUDY_PREPROJECT_NOT_EXECUTIVE'})
+      const project=await c.query(`select id,name,status from aitec.project where id=$1 and tenant_id=$2`,[projectId,s.organizationId]);
+      if(!project.rowCount)throw new HttpException('aitec_project_not_found',404);
+      if(constraintSnapshotId){
+        const snapshot=await c.query(`select id from aitec.constraint_snapshot where id=$1 and project_id=$2 and tenant_id=$3`,[constraintSnapshotId,projectId,s.organizationId]);
+        if(!snapshot.rowCount)throw new HttpException('constraint_snapshot_not_found',404);
+      }
+      const context:any={tenant_id:s.organizationId,project_id:projectId};
+      if(constraintSnapshotId)context.constraint_snapshot_id=constraintSnapshotId;
+      if(seed!==null)context.seed=seed;
+      const r=await c.query(`insert into aitec.job(tenant_id,project_id,constraint_snapshot_id,operation,args,kwargs,execution_context,status,created_by)
+        values($1,$2,$3,$4,$5::jsonb,$6::jsonb,$7::jsonb,'QUEUED',$8)
+        returning id,project_id,constraint_snapshot_id,operation,status,attempts,execution_context,created_at`,[
+        s.organizationId,projectId,constraintSnapshotId,operation,JSON.stringify(args),JSON.stringify(kwargs),JSON.stringify(context),s.email||s.id,
       ]);
-      const job=queued.rows[0];
-      const base=process.env.AITEC_ENGINE_INTERNAL_URL||'http://aitec-engine:8002';
-      const token=process.env.INTERNAL_API_TOKEN||'';
-      let response:Response;
-      try{
-        response=await fetch(`${base}/aitec/v20/execute/${encodeURIComponent(operation)}`,{
-          method:'POST',headers:{'content-type':'application/json','x-internal-token':token},
-          body:JSON.stringify({args,kwargs,context:{tenant_id:s.organizationId,project_id:projectId,constraint_snapshot_id:constraintSnapshotId||undefined,seed:seed??undefined}}),
-        });
-      }catch(exc:any){
-        await c.query(`update aitec.scenario set status='FAILED',metrics=metrics||$2::jsonb where id=$1`,[job.id,JSON.stringify({error:'aitec_engine_unreachable',detail:String(exc?.message||exc).slice(0,500)})]);
-        throw new HttpException('aitec_engine_unreachable',502);
-      }
-      const data=await response.json().catch(()=>({} as any)) as any;
-      if(!response.ok){
-        await c.query(`update aitec.scenario set status='FAILED',metrics=metrics||$2::jsonb where id=$1`,[job.id,JSON.stringify({engineStatus:response.status,error:data?.detail||data?.message||'solver_failed'})]);
-        throw new HttpException(data?.detail||data?.message||`aitec_engine_${response.status}`,response.status===404?422:502);
-      }
-      const solverVersion=String(data?.solver_version||'unknown');
-      const metrics={operation,args,kwargs,seed,classification:data?.classification||'STUDY_PREPROJECT_NOT_EXECUTIVE',professional_review_required:data?.professional_review_required!==false,result:data?.result??null,limitations:Array.isArray(data?.limitations)?data.limitations:[]};
-      const done=await c.query(`update aitec.scenario set status='COMPLETED',solver_version=$2,metrics=$3::jsonb where id=$1 returning id,project_id,constraint_snapshot_id,solver_version,status,metrics,created_at`,[job.id,solverVersion,JSON.stringify(metrics)]);
-      return done.rows[0];
+      const job=r.rows[0];
+      await enqueueOutbox(c,'aitec.job.queued',{jobId:job.id,projectId,operation},{tenantId:s.organizationId,aggregateType:'aitec.job',aggregateId:job.id,dedupeKey:`aitec.job.queued:${job.id}`});
+      return{...job,project:{id:project.rows[0].id,name:project.rows[0].name}};
     });
-    return{...idem.value,project:{id:project.id,name:project.name},idempotency:{replayed:idem.replayed,key:key||null,contract:'aitec.v20.job'}};
+    return{...idem.value,idempotency:{key,replayed:idem.replayed,contract:'aitec.v20.job'}};
   }
 
   @Get('jobs/:jobId')
   async get(@Req() req:any,@Param('jobId') jobId:string){
     const s=await this.session(req);
     return tenantTx(pool,s.organizationId,async c=>{
-      const r=await c.query(`select s.id,s.project_id,s.constraint_snapshot_id,s.solver_version,s.status,s.metrics,s.artifact_key,s.created_at,p.name project_name
-        from aitec.scenario s join aitec.project p on p.id=s.project_id and p.tenant_id=s.tenant_id
-        where s.id=$1 and s.tenant_id=$2`,[jobId,s.organizationId]);
+      const r=await c.query(`select j.id,j.project_id,j.constraint_snapshot_id,j.operation,j.status,j.attempts,j.execution_context,j.solver_version,j.classification,j.professional_review_required,j.engine_response,j.error,j.created_by,j.created_at,j.started_at,j.completed_at,p.name project_name
+        from aitec.job j join aitec.project p on p.id=j.project_id and p.tenant_id=j.tenant_id
+        where j.id=$1 and j.tenant_id=$2`,[jobId,s.organizationId]);
       if(!r.rowCount)throw new HttpException('aitec_job_not_found',404);
       return r.rows[0];
     });

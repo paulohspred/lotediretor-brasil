@@ -48,6 +48,7 @@ export BROWSER_ARTIFACT_DIR="$ARTIFACT_DIR/browser"
 export LOAD_ARTIFACT_DIR="$ARTIFACT_DIR/load"
 export OBSERVABILITY_ARTIFACT_DIR="$ARTIFACT_DIR/observability"
 export RESILIENCE_ARTIFACT_DIR="$ARTIFACT_DIR/resilience"
+export SECURITY_ARTIFACT_DIR="$ARTIFACT_DIR/security"
 mkdir -p "$ARTIFACT_DIR"
 
 for cmd in docker python3 curl; do command -v "$cmd" >/dev/null || { echo "$cmd is required" >&2; exit 1; }; done
@@ -120,8 +121,13 @@ bash ./ops/ai/runtime-integration.sh
 echo '==> Browser/OIDC/mobile/a11y'
 bash ./ops/browser/run-e2e.sh
 
-echo '==> Observability stack and Prometheus targets'
-bash ./ops/observability/runtime-gate.sh
+echo '==> Runtime security baseline'
+bash ./ops/security/runtime-baseline.sh
+
+if [[ "${CORTEX_ZAP:-0}" == "1" ]]; then
+  echo '==> OWASP ZAP baseline'
+  bash ./ops/security/zap-baseline.sh
+fi
 
 echo "==> Load profile: $PROFILE"
 LOAD_PROFILE="$PROFILE" bash ./ops/load/run.sh
@@ -130,6 +136,9 @@ if [[ "${CORTEX_FAULT_INJECTION:-1}" == "1" ]]; then
   echo '==> Controlled Docker fault injection and recovery'
   bash ./ops/resilience/runtime-fault-injection.sh
 fi
+
+echo '==> Observability stack and Prometheus targets after resilience tests'
+bash ./ops/observability/runtime-gate.sh
 
 echo '==> Backup/restore drill'
 BACKUP_STAMP="cortex-$STAMP"

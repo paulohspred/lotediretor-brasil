@@ -11,6 +11,10 @@ services:
       - CMD-SHELL
       - pg_isready -h 127.0.0.1 -U ${CONTROL_DB_MIGRATION_USER:-lotediretor_control} -d ${CONTROL_DB_NAME:-lotediretor_control}
       start_period: 15s
+  minio:
+    image: ${MINIO_IMAGE:-minio/minio:RELEASE.2025-07-23T15-54-02Z}
+  minio-init:
+    image: ${MINIO_MC_IMAGE:-minio/mc:RELEASE.2025-08-13T08-35-41Z}
   opensearch:
     environment:
       DISABLE_INSTALL_DEMO_CONFIG: 'true'

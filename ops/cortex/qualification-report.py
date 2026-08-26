@@ -11,6 +11,7 @@ requested_status = sys.argv[2] if len(sys.argv) > 2 else 'UNKNOWN'
 profile = sys.argv[3] if len(sys.argv) > 3 else 'ci'
 
 required_gates = [
+    'production_parity','staging_parity','immutable_release','rollback_contract',
     'compose_model','build_images','stack_health','runtime_smoke','aitec_runtime',
     'rls_isolation','privacy_lgpd','municipality_factory','ai_retrieval',
     'critical_fixture_seed','browser_critical','security_baseline','load_profile',
@@ -19,7 +20,7 @@ required_gates = [
 
 external_gates = [
     {'gate':'independent_pentest','status':'NOT_HOMOLOGATED','reason':'requires independent authorized assessment and closure of all Critical/High findings'},
-    {'gate':'production_like_staging','status':'NOT_HOMOLOGATED','reason':'requires deployed infrastructure equivalent to the selected production provider'},
+    {'gate':'production_like_staging','status':'NOT_HOMOLOGATED','reason':'structural staging parity is tested locally, but deployed cloud/network/provider equivalence still requires final-environment evidence'},
     {'gate':'live_canary_rollback','status':'NOT_HOMOLOGATED','reason':'repository contains executable canary/rollback contracts, but live execution is environment evidence'},
     {'gate':'production_ha_dr','status':'NOT_HOMOLOGATED','reason':'local DR evidence is synthetic; production RPO/RTO and PITR/failover require the final environment'},
     {'gate':'official_sources_and_providers','status':'NOT_HOMOLOGATED','reason':'live credentials, licenses, municipal/official datasets and provider evidence remain external'},
@@ -37,7 +38,9 @@ def read_json(path: Path):
 
 def file_check(name: str, path: Path, validator=None):
     if not path.exists() or not path.is_file():
-        return {'check':name,'status':'FAIL','path':str(path.relative_to(artifact)) if path.is_absolute() and artifact in path.parents else str(path),'reason':'missing'}
+        try: display=str(path.relative_to(artifact))
+        except Exception: display=str(path)
+        return {'check':name,'status':'FAIL','path':display,'reason':'missing'}
     value = read_json(path) if path.suffix == '.json' else None
     if validator:
         try:
@@ -56,14 +59,18 @@ if ledger.exists():
         parts=line.split('\t')
         if len(parts) < 5: continue
         gate,status,started,completed,duration = parts[:5]
-        gates[gate]={'gate':gate,'status':status,'startedAtUtc':started,'completedAtUtc':completed,'durationSeconds':float(duration) if duration else None}
+        try: duration_value=float(duration) if duration else None
+        except ValueError: duration_value=None
+        gates[gate]={'gate':gate,'status':status,'startedAtUtc':started,'completedAtUtc':completed,'durationSeconds':duration_value}
 
-local_gate_results=[]
-for gate in required_gates:
-    local_gate_results.append(gates.get(gate,{'gate':gate,'status':'MISSING'}))
+local_gate_results=[gates.get(gate,{'gate':gate,'status':'MISSING'}) for gate in required_gates]
 
 checks=[]
 checks.append(file_check('qualification_status',artifact/'qualification.json',lambda v,p:(isinstance(v,dict) and v.get('status')==requested_status,f"status={v.get('status') if isinstance(v,dict) else None}")))
+checks.append(file_check('production_parity',artifact/'production-parity.json',lambda v,p:(isinstance(v,dict) and v.get('status')=='PASS',f"errors={v.get('errors') if isinstance(v,dict) else None}")))
+checks.append(file_check('staging_parity',artifact/'staging-parity.json',lambda v,p:(isinstance(v,dict) and v.get('status')=='PASS' and v.get('classification')=='STRUCTURAL_STAGING_PARITY_CONTRACT_NOT_DEPLOYED_STAGING_EVIDENCE',f"classification={v.get('classification') if isinstance(v,dict) else None}")))
+checks.append(file_check('immutable_release',artifact/'immutable-release.json',lambda v,p:(isinstance(v,dict) and v.get('status')=='PASS' and int(v.get('promotedServices',0))>=20,f"promotedServices={v.get('promotedServices') if isinstance(v,dict) else None}")))
+checks.append(file_check('rollback_contract',artifact/'rollback-contract.txt',lambda v,p:(bool(p.read_text(encoding='utf-8',errors='replace').strip()),'rollback self-test output present')))
 checks.append(file_check('platform_migrations',artifact/'platform-migrations.txt',lambda v,p:(bool(p.read_text().strip()),'non-empty migration ledger')))
 checks.append(file_check('control_migrations',artifact/'control-migrations.txt',lambda v,p:(bool(p.read_text().strip()),'non-empty migration ledger')))
 checks.append(file_check('playwright_results',artifact/'browser'/'playwright-results.json',lambda v,p:(isinstance(v,dict) and int((v.get('stats') or {}).get('unexpected',0))==0 and int((v.get('stats') or {}).get('expected',0))>0,f"stats={(v or {}).get('stats') if isinstance(v,dict) else None}")))
@@ -79,7 +86,6 @@ else:
     checks.append({'check':'dr_evidence','status':'FAIL','reason':'missing runtime-artifacts/dr/dr-*.json'})
 
 checks.append(file_check('opensearch_health',artifact/'opensearch-health.json',lambda v,p:(isinstance(v,dict) and str(v.get('status','')).lower() in {'green','yellow'},f"cluster_status={v.get('status') if isinstance(v,dict) else None}")))
-
 for name in ('ld-ai-a.json','ld-ai-b-leak.json','ld-ai-public.json','ld-ai-future.json'):
     checks.append(file_check(f'ai_runtime_{name}',artifact/name))
 
@@ -107,37 +113,15 @@ report={
 json_path=artifact/'qualification-report.json'
 json_path.write_text(json.dumps(report,indent=2,ensure_ascii=False)+'\n',encoding='utf-8')
 
-md=[]
-md.append('# LoteDiretor — Local Qualification Report')
-md.append('')
-md.append(f'- Generated: `{report["generatedAtUtc"]}`')
-md.append(f'- Profile: `{profile}`')
-md.append(f'- Local qualification: **{local_status}**')
-md.append('- Production homologated: **NO**')
-md.append('')
-md.append('## Local gates')
-md.append('')
-md.append('| Gate | Status | Duration (s) |')
-md.append('|---|---:|---:|')
-for item in local_gate_results:
-    md.append(f'| `{item["gate"]}` | {item.get("status")} | {item.get("durationSeconds","")} |')
-md.append('')
-md.append('## Evidence checks')
-md.append('')
-md.append('| Evidence | Status | Detail |')
-md.append('|---|---:|---|')
+md=['# LoteDiretor — Local Qualification Report','',f'- Generated: `{report["generatedAtUtc"]}`',f'- Profile: `{profile}`',f'- Local qualification: **{local_status}**','- Production homologated: **NO**','','## Local gates','','| Gate | Status | Duration (s) |','|---|---:|---:|']
+for item in local_gate_results: md.append(f'| `{item["gate"]}` | {item.get("status")} | {item.get("durationSeconds","")} |')
+md += ['','## Evidence checks','','| Evidence | Status | Detail |','|---|---:|---|']
 for item in checks:
     detail=item.get('detail') or item.get('reason') or item.get('path') or ''
     md.append(f'| `{item["check"]}` | {item.get("status")} | {str(detail).replace("|","/")} |')
-md.append('')
-md.append('## External/final gates')
-md.append('')
-md.append('| Gate | Status | Reason |')
-md.append('|---|---:|---|')
-for item in external_gates:
-    md.append(f'| `{item["gate"]}` | {item["status"]} | {item["reason"]} |')
-md.append('')
-md.append('`productionHomologated` remains `false` until the external/final gates have real environment evidence.')
+md += ['','## External/final gates','','| Gate | Status | Reason |','|---|---:|---|']
+for item in external_gates: md.append(f'| `{item["gate"]}` | {item["status"]} | {item["reason"]} |')
+md += ['','`productionHomologated` remains `false` until the external/final gates have real environment evidence.']
 (artifact/'qualification-report.md').write_text('\n'.join(md)+'\n',encoding='utf-8')
 
 print(json_path)

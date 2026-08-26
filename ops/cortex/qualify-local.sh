@@ -61,6 +61,13 @@ capture(){
   docker compose ps -a > "$ARTIFACT_DIR/compose-ps.txt" 2>&1
   docker compose logs --no-color --timestamps > "$ARTIFACT_DIR/compose.log" 2>&1
   docker system df > "$ARTIFACT_DIR/docker-df.txt" 2>&1
+  docker compose images --format json > "$ARTIFACT_DIR/compose-images.jsonl" 2>/dev/null || true
+  docker compose exec -T -e PGPASSWORD="$PLATFORM_DB_MIGRATION_PASSWORD" platform-db \
+    psql -h 127.0.0.1 -U "$PLATFORM_DB_MIGRATION_USER" -d "$PLATFORM_DB_NAME" -Atqc \
+    "select version from public.schema_migrations order by version" > "$ARTIFACT_DIR/platform-migrations.txt" 2>/dev/null || true
+  docker compose exec -T -e PGPASSWORD="$CONTROL_DB_MIGRATION_PASSWORD" control-db \
+    psql -h 127.0.0.1 -U "$CONTROL_DB_MIGRATION_USER" -d "$CONTROL_DB_NAME" -Atqc \
+    "select version from public.schema_migrations order by version" > "$ARTIFACT_DIR/control-migrations.txt" 2>/dev/null || true
   cp /tmp/ld-opensearch-health.json "$ARTIFACT_DIR/opensearch-health.json" 2>/dev/null
   cp /tmp/ld-ai-*.json "$ARTIFACT_DIR/" 2>/dev/null
   cp /tmp/ld-aitec-*.json "$ARTIFACT_DIR/" 2>/dev/null
@@ -69,9 +76,18 @@ capture(){
 }
 
 finish(){
-  local code=$?
+  local code=$? status
   trap - EXIT
-  capture "$([ "$code" -eq 0 ] && echo PASS || echo FAIL)"
+  status="$([ "$code" -eq 0 ] && echo PASS || echo FAIL)"
+  capture "$status"
+  if ! python3 ./ops/cortex/evidence-manifest.py "$ARTIFACT_DIR" "$status" "$PROFILE"; then
+    echo 'Evidence manifest generation failed' >&2
+    if [[ "$code" -eq 0 ]]; then
+      code=1
+      status=FAIL
+      capture "$status"
+    fi
+  fi
   echo "Cortex qualification artifacts: $ARTIFACT_DIR"
   if [[ "${CORTEX_KEEP_STACK:-1}" == "1" ]]; then
     echo "Stack left running for inspection (CORTEX_KEEP_STACK=0 to auto-teardown)."

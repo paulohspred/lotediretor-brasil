@@ -23,7 +23,20 @@ async function json(response,label){
   return body;
 }
 
-test('critical journey: real OIDC -> A.I TEC project -> persisted v20 job -> reproducible result',async({page})=>{
+async function pollJob(request,id,timeoutMs=90_000){
+  const deadline=Date.now()+timeoutMs;
+  let last;
+  while(Date.now()<deadline){
+    last=await json(await request.get(`/api/v1/aitec/jobs/${id}`),'A.I TEC job status');
+    if(last.status==='COMPLETED')return last;
+    if(last.status==='FAILED'||last.status==='CANCELLED')throw new Error(`A.I TEC job terminal failure: ${JSON.stringify(last)}`);
+    expect(['QUEUED','RUNNING']).toContain(last.status);
+    await new Promise(resolve=>setTimeout(resolve,1000));
+  }
+  throw new Error(`A.I TEC job did not complete within ${timeoutMs}ms; last=${JSON.stringify(last)}`);
+}
+
+test('critical journey: real OIDC -> A.I TEC project -> queued v20 job -> worker -> reproducible persisted result',async({page})=>{
   const request=await login(page);
   const nonce=Date.now();
 
@@ -42,31 +55,39 @@ test('critical journey: real OIDC -> A.I TEC project -> persisted v20 job -> rep
       {x:10,y:10,z:103},
     ]},
   };
-  const job=await json(await request.post(`/api/v1/aitec/projects/${project.id}/jobs`,{
+  const queued=await json(await request.post(`/api/v1/aitec/projects/${project.id}/jobs`,{
     headers:{'Idempotency-Key':key},data:payload,
-  }),'create A.I TEC job');
+  }),'queue A.I TEC job');
 
-  expect(job.id).toBeTruthy();
-  expect(job.project_id).toBe(project.id);
-  expect(job.status).toBe('COMPLETED');
-  expect(job.solver_version).toBe('aitec-terrain-v20.1');
-  expect(job.metrics.operation).toBe('terrain.tin');
-  expect(job.metrics.seed).toBe(42);
-  expect(job.metrics.classification).toBe('STUDY_PREPROJECT_NOT_EXECUTIVE');
-  expect(job.metrics.professional_review_required).toBe(true);
-  expect(job.metrics.result.status).toBe('CALCULATED');
-  expect(job.metrics.result.triangle_count).toBeGreaterThanOrEqual(2);
+  expect(queued.id).toBeTruthy();
+  expect(queued.project_id).toBe(project.id);
+  expect(queued.operation).toBe('terrain.tin');
+  expect(queued.status).toBe('QUEUED');
+  expect(queued.attempts).toBe(0);
+  expect(queued.execution_context.tenant_id).toBeTruthy();
+  expect(queued.execution_context.project_id).toBe(project.id);
+  expect(queued.execution_context.seed).toBe(42);
 
   const replay=await json(await request.post(`/api/v1/aitec/projects/${project.id}/jobs`,{
     headers:{'Idempotency-Key':key},data:payload,
   }),'replay A.I TEC job');
   expect(replay.idempotency.replayed).toBe(true);
-  expect(replay.id).toBe(job.id);
+  expect(replay.id).toBe(queued.id);
 
-  const persisted=await json(await request.get(`/api/v1/aitec/jobs/${job.id}`),'get A.I TEC job');
-  expect(persisted.id).toBe(job.id);
-  expect(persisted.project_id).toBe(project.id);
-  expect(persisted.status).toBe('COMPLETED');
-  expect(persisted.solver_version).toBe('aitec-terrain-v20.1');
-  expect(persisted.metrics.result.triangle_count).toBe(job.metrics.result.triangle_count);
+  const completed=await pollJob(request,queued.id);
+  expect(completed.id).toBe(queued.id);
+  expect(completed.project_id).toBe(project.id);
+  expect(completed.operation).toBe('terrain.tin');
+  expect(completed.status).toBe('COMPLETED');
+  expect(completed.attempts).toBeGreaterThanOrEqual(1);
+  expect(completed.solver_version).toBe('aitec-terrain-v20.1');
+  expect(completed.classification).toBe('STUDY_PREPROJECT_NOT_EXECUTIVE');
+  expect(completed.professional_review_required).toBe(true);
+  expect(completed.engine_response.status).toBe('EXECUTED');
+  expect(completed.engine_response.operation).toBe('terrain.tin');
+  expect(completed.engine_response.context.project_id).toBe(project.id);
+  expect(completed.engine_response.context.seed).toBe(42);
+  expect(completed.engine_response.result.status).toBe('CALCULATED');
+  expect(completed.engine_response.result.triangle_count).toBeGreaterThanOrEqual(2);
+  expect(completed.completed_at).toBeTruthy();
 });

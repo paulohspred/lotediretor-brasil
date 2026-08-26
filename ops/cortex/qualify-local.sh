@@ -157,6 +157,7 @@ run_gate rls_isolation bash ./ops/rls/runtime-isolation.sh
 run_gate privacy_lgpd bash ./ops/privacy/runtime-integration.sh
 run_gate municipality_factory bash ./ops/municipality/factory-runtime.sh
 run_gate ai_retrieval bash ./ops/ai/runtime-integration.sh
+run_gate ai_redteam_runtime bash ./ops/security/ai-redteam-runtime.sh
 run_gate critical_fixture_seed bash ./ops/browser/seed-critical-journeys.sh
 run_gate browser_critical bash ./ops/browser/run-e2e.sh
 run_gate security_baseline bash ./ops/security/runtime-baseline.sh

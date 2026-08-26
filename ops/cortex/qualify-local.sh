@@ -134,7 +134,10 @@ bash ./ops/municipality/factory-runtime.sh
 echo '==> OpenSearch AI ingest/retrieval isolation'
 bash ./ops/ai/runtime-integration.sh
 
-echo '==> Browser/OIDC/mobile/a11y'
+echo '==> Seed explicitly synthetic critical business-journey fixtures'
+bash ./ops/browser/seed-critical-journeys.sh
+
+echo '==> Browser/OIDC/mobile/a11y and critical business journeys'
 bash ./ops/browser/run-e2e.sh
 
 echo '==> Runtime security baseline'

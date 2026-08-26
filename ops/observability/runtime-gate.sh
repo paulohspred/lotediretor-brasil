@@ -93,7 +93,7 @@ for group in rules.get('data',{}).get('groups',[]):
     for rule in group.get('rules',[]):
         if rule.get('name'):rule_names.append(rule['name'])
 required_rules={
-  'LoteDiretorServiceDown','LoteDiretorTargetMissing',
+  'LoteDiretorServiceDown','LoteDiretorTargetMissing','LoteDiretorEdgeProbeDown',
   'LoteDiretorHigh5xxRate','LoteDiretorCritical5xxRate','LoteDiretorHighP95Latency'
 }
 missing_rules=sorted(required_rules-set(rule_names))

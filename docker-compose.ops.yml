@@ -11,6 +11,27 @@ services:
   aitec-engine:
     environment:
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+  aitec-worker:
+    profiles: [full]
+    build:
+      context: .
+      dockerfile: workers/aitec/Dockerfile
+    environment:
+      PLATFORM_DATABASE_URL: postgresql://lotediretor_worker:${PLATFORM_DB_WORKER_PASSWORD:-change-me-worker}@platform-db:5432/${PLATFORM_DB_NAME:-lotediretor}
+      AITEC_ENGINE_INTERNAL_URL: ${AITEC_ENGINE_INTERNAL_URL:-http://aitec-engine:8002}
+      INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN:-local-internal-change-me}
+      AITEC_JOB_POLL_SECONDS: ${AITEC_JOB_POLL_SECONDS:-1}
+      AITEC_JOB_TIMEOUT_SECONDS: ${AITEC_JOB_TIMEOUT_SECONDS:-180}
+      AITEC_JOB_MAX_ATTEMPTS: ${AITEC_JOB_MAX_ATTEMPTS:-3}
+      AITEC_JOB_STALE_SECONDS: ${AITEC_JOB_STALE_SECONDS:-600}
+    depends_on:
+      platform-db:
+        condition: service_healthy
+      platform-db-role-init:
+        condition: service_completed_successfully
+      aitec-engine:
+        condition: service_healthy
+    restart: unless-stopped
   blackbox-exporter:
     profiles: [ops]
     image: prom/blackbox-exporter:v0.27.0

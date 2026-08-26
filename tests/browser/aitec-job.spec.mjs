@@ -44,7 +44,6 @@ test('critical journey: real OIDC -> A.I TEC project -> queued v20 job -> worker
   expect(project.id).toBeTruthy();
   expect(project.status).toBe('DRAFT');
 
-  const key=`browser-aitec-job-${nonce}`;
   const payload={
     operation:'terrain.tin',
     seed:42,
@@ -55,6 +54,19 @@ test('critical journey: real OIDC -> A.I TEC project -> queued v20 job -> worker
       {x:10,y:10,z:103},
     ]},
   };
+
+  const missingKey=await request.post(`/api/v1/aitec/projects/${project.id}/jobs`,{data:payload});
+  expect(missingKey.status()).toBe(400);
+  expect(await missingKey.text()).toContain('idempotency_key_required');
+
+  const disallowed=await request.post(`/api/v1/aitec/projects/${project.id}/jobs`,{
+    headers:{'Idempotency-Key':`browser-aitec-deny-${nonce}`},
+    data:{operation:'shell.execute',kwargs:{command:'never-run'}},
+  });
+  expect(disallowed.status()).toBe(400);
+  expect(await disallowed.text()).toContain('aitec_operation_not_allowed');
+
+  const key=`browser-aitec-job-${nonce}`;
   const queued=await json(await request.post(`/api/v1/aitec/projects/${project.id}/jobs`,{
     headers:{'Idempotency-Key':key},data:payload,
   }),'queue A.I TEC job');

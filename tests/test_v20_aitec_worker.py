@@ -10,6 +10,8 @@ import urllib.error
 os.environ.setdefault('PLATFORM_DATABASE_URL','postgresql://unused')
 os.environ.setdefault('INTERNAL_API_TOKEN','unit-test-token')
 os.environ.setdefault('AITEC_JOB_MAX_RESPONSE_BYTES','4096')
+os.environ.setdefault('AITEC_JOB_RETRY_BASE_SECONDS','5')
+os.environ.setdefault('AITEC_JOB_RETRY_MAX_SECONDS','60')
 
 ROOT=pathlib.Path(__file__).resolve().parents[1]
 spec=importlib.util.spec_from_file_location('aitec_worker',ROOT/'workers'/'aitec'/'main.py')
@@ -88,6 +90,21 @@ try:
 finally:
     worker.urllib.request.urlopen=original
 
+# Retry scheduling is exponential and bounded so transient outages cannot hot-loop
+# through all attempts in a few polling cycles.
+assert worker.retry_delay_seconds(1)==5
+assert worker.retry_delay_seconds(2)==10
+assert worker.retry_delay_seconds(3)==20
+assert worker.retry_delay_seconds(4)==40
+assert worker.retry_delay_seconds(5)==60
+assert worker.retry_delay_seconds(20)==60
+worker_source=(ROOT/'workers'/'aitec'/'main.py').read_text()
+migration=(ROOT/'db'/'platform'/'migrations'/'214_v20_aitec_job_retry_schedule.sql').read_text()
+assert "status='QUEUED' and next_attempt_at <= now()" in worker_source
+assert 'next_attempt_at=case when' in worker_source
+assert 'ADD COLUMN IF NOT EXISTS next_attempt_at' in migration
+assert 'aitec_job_ready_idx' in migration
+
 # Queue telemetry must remain low-cardinality. Tenant/project/job/operation identifiers
 # are deliberately excluded from labels; they remain in logs/persisted evidence instead.
 assert tuple(worker.JOB_STATE._labelnames)==('status',)
@@ -116,4 +133,4 @@ assert worker.JOB_STATE.labels(status='CANCELLED')._value.get()==0
 assert worker.OLDEST_JOB_AGE.labels(status='FAILED')._value.get()==90.0
 assert worker.LAST_DB_SUCCESS._value.get()>0
 
-print('v20 A.I TEC worker trust-boundary + low-cardinality telemetry tests OK')
+print('v20 A.I TEC worker trust-boundary + retry scheduling + low-cardinality telemetry tests OK')

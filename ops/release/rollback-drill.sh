@@ -4,7 +4,7 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$ROOT_DIR"
 
 IMAGE_VARS=(
-  PLATFORM_API_IMAGE CONTROL_API_IMAGE AI_GATEWAY_IMAGE SOLAR_ENGINE_IMAGE AITEC_ENGINE_IMAGE
+  PLATFORM_API_IMAGE CONTROL_API_IMAGE AI_GATEWAY_IMAGE SOLAR_ENGINE_IMAGE AITEC_ENGINE_IMAGE AITEC_WORKER_IMAGE
   EVENT_DISPATCHER_IMAGE GEO_WORKER_IMAGE DOCUMENT_WORKER_IMAGE REPORT_WORKER_IMAGE
   RURAL_MONITOR_WORKER_IMAGE RURAL_EXPORT_WORKER_IMAGE BILLING_WORKER_IMAGE DATA_PIPELINES_IMAGE
   AI_INGEST_IMAGE SITE_WEB_IMAGE CLIENT_WEB_IMAGE ADMIN_WEB_IMAGE
@@ -51,8 +51,6 @@ CANDIDATE_ENV="$1"; PREVIOUS_ENV="$2"
 [[ -f "$CANDIDATE_ENV" ]] || { echo "candidate env not found: $CANDIDATE_ENV" >&2; exit 2; }
 [[ -f "$PREVIOUS_ENV" ]] || { echo "previous env not found: $PREVIOUS_ENV" >&2; exit 2; }
 
-# Safe fixtures are used only by the CI self-test/render path. A real execution
-# must pass production-like values and pass the production preflight.
 if [[ "${ROLLBACK_SELF_TEST:-0}" == "1" ]]; then
   export PUBLIC_DOMAIN="${PUBLIC_DOMAIN:-app.example.com}" AUTH_DOMAIN="${AUTH_DOMAIN:-auth.example.com}" ACME_EMAIL="${ACME_EMAIL:-ops@example.com}"
   export KEYCLOAK_ADMIN="${KEYCLOAK_ADMIN:-release-ci}" KEYCLOAK_ADMIN_PASSWORD="${KEYCLOAK_ADMIN_PASSWORD:-release-keycloak-fixture-2026}"
@@ -125,8 +123,6 @@ export COMPOSE_PROJECT_NAME
 export COMPOSE_FILE="docker-compose.yml:docker-compose.production.yml:docker-compose.release.yml"
 export COMPOSE_PROFILES="full,ops"
 
-# Preserve a recoverable baseline before candidate migration/start. We never run
-# automatic down migrations or a destructive restore in this drill.
 BACKUP_DIR="${BACKUP_DIR:-$ARTIFACT_DIR/backups}" ./ops/backup/backup.sh "pre-candidate"
 
 echo '==> Deploy immutable candidate'

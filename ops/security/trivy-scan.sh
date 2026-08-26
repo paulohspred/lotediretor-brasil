@@ -22,6 +22,7 @@ fi
 run_trivy(){
   docker run --rm \
     -v "$ROOT_DIR:/workspace:ro" \
+    -v "$ARTIFACT_DIR:/artifacts" \
     -v "$TRIVY_CACHE_DIR:/root/.cache/trivy" \
     -v /var/run/docker.sock:/var/run/docker.sock \
     "$TRIVY_IMAGE" "$@"
@@ -34,7 +35,7 @@ run_trivy fs \
   --ignore-unfixed \
   --exit-code 1 \
   --format json \
-  --output /workspace/${ARTIFACT_DIR#"$ROOT_DIR/"}/trivy-fs.json \
+  --output /artifacts/trivy-fs.json \
   /workspace
 
 # Produce an all-severity machine-readable inventory as evidence even though only
@@ -45,7 +46,7 @@ run_trivy fs \
   --ignore-unfixed \
   --exit-code 0 \
   --format json \
-  --output /workspace/${ARTIFACT_DIR#"$ROOT_DIR/"}/trivy-fs-all.json \
+  --output /artifacts/trivy-fs-all.json \
   /workspace
 
 if [[ "$SCAN_IMAGES" == "1" ]]; then
@@ -68,6 +69,7 @@ for line in sys.stdin:
     safe=$(printf '%s' "$image" | sed -E 's#[^A-Za-z0-9_.-]+#_#g')
     echo "scan $image"
     if docker run --rm \
+      -v "$ARTIFACT_DIR:/artifacts" \
       -v "$TRIVY_CACHE_DIR:/root/.cache/trivy" \
       -v /var/run/docker.sock:/var/run/docker.sock \
       "$TRIVY_IMAGE" image \
@@ -76,7 +78,7 @@ for line in sys.stdin:
       --ignore-unfixed \
       --exit-code 1 \
       --format json \
-      --output "/tmp/result.json" \
+      --output "/artifacts/trivy-image-${safe}.json" \
       "$image"; then
       printf '%s\tPASS\n' "$image" >> "$ARTIFACT_DIR/trivy-images.tsv"
     else

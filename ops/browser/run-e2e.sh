@@ -26,7 +26,7 @@ docker run --rm \
     npm init -y >/dev/null
     npm install --no-save --package-lock=false --no-audit --no-fund @playwright/test@${PLAYWRIGHT_VERSION} @axe-core/playwright@${AXE_VERSION} >/dev/null
     cp /suite/*.mjs /work/
-    npx playwright test --config=/work/playwright.config.mjs /work/platform.spec.mjs
+    npx playwright test --config=/work/playwright.config.mjs
   "
 
 echo "Browser E2E artifacts: $ARTIFACT_DIR"

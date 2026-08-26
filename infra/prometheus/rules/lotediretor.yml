@@ -1,13 +1,49 @@
 groups:
   - name: lotediretor-runtime
     rules:
+      - record: lotediretor:http_requests:rate5m
+        expr: sum by (service) (rate(lotediretor_http_requests_total[5m]))
+      - record: lotediretor:http_5xx:ratio5m
+        expr: sum by (service) (rate(lotediretor_http_requests_total{status_class="5xx"}[5m])) / clamp_min(sum by (service) (rate(lotediretor_http_requests_total[5m])), 0.001)
+      - record: lotediretor:http_latency:p95_5m
+        expr: histogram_quantile(0.95, sum by (service, le) (rate(lotediretor_http_request_duration_seconds_bucket[5m])))
+
       - alert: LoteDiretorServiceDown
         expr: lotediretor_service_up == 0
         for: 2m
         labels: {severity: critical}
-        annotations: {summary: "LoteDiretor service/database unavailable"}
+        annotations:
+          summary: "LoteDiretor service/database unavailable"
+          runbook: "docs/ops/RUNBOOKS.md#service-or-database-down"
+
       - alert: LoteDiretorTargetMissing
         expr: up == 0
         for: 2m
         labels: {severity: critical}
-        annotations: {summary: "Prometheus target unavailable"}
+        annotations:
+          summary: "Prometheus target unavailable"
+          runbook: "docs/ops/RUNBOOKS.md#prometheus-target-missing"
+
+      - alert: LoteDiretorHigh5xxRate
+        expr: lotediretor:http_5xx:ratio5m > 0.01
+        for: 5m
+        labels: {severity: warning}
+        annotations:
+          summary: "HTTP 5xx ratio above 1% for {{ $labels.service }}"
+          runbook: "docs/ops/RUNBOOKS.md#high-http-5xx-rate"
+
+      - alert: LoteDiretorCritical5xxRate
+        expr: lotediretor:http_5xx:ratio5m > 0.05
+        for: 2m
+        labels: {severity: critical}
+        annotations:
+          summary: "HTTP 5xx ratio above 5% for {{ $labels.service }}"
+          runbook: "docs/ops/RUNBOOKS.md#high-http-5xx-rate"
+
+      - alert: LoteDiretorHighP95Latency
+        expr: lotediretor:http_latency:p95_5m > 1.5
+        for: 10m
+        labels: {severity: warning}
+        annotations:
+          summary: "HTTP p95 latency above 1.5s for {{ $labels.service }}"
+          runbook: "docs/ops/RUNBOOKS.md#high-p95-latency"

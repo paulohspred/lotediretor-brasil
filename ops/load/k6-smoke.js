@@ -39,6 +39,7 @@ export const options={
 const base=(__ENV.BASE_URL||'http://127.0.0.1:8080').replace(/\/$/,'');
 const internalToken=__ENV.INTERNAL_API_TOKEN||'';
 const loadTenant=__ENV.LOAD_AI_TENANT_ID||'0198f020-0000-7000-8000-000000000001';
+const forbiddenAiRow=__ENV.LOAD_AI_FORBIDDEN_ROW_ID||'0198f020-1000-7000-8000-000000000002';
 const internalHeaders={'X-Internal-Token':internalToken,'Content-Type':'application/json'};
 
 function get(path,name,headers={}){
@@ -100,7 +101,8 @@ export default function(){
     const retrievalJson=jsonBody(retrieval);
     check(retrieval,{
       'AI retrieval contract':()=>retrievalJson?.status==='OK'&&Array.isArray(retrievalJson?.items),
-      'AI retrieval tenant context preserved':()=>String(retrievalJson?.tenantId||loadTenant)===loadTenant,
+      'AI retrieval excludes foreign tenant row':()=>Array.isArray(retrievalJson?.items)&&!retrievalJson.items.some(item=>String(item?.id||'')===forbiddenAiRow),
+      'AI retrieval excludes foreign tenant secret':()=>Array.isArray(retrievalJson?.items)&&!retrievalJson.items.some(item=>String(item?.text||'').includes('SEGREDO BETA')),
     });
   }
   sleep(0.25);

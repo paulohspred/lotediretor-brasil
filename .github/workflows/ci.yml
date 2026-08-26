@@ -42,7 +42,7 @@ jobs:
       - name: Validate full observability compose
         run: docker compose -f docker-compose.yml -f docker-compose.ci.yml -f docker-compose.ops.yml --profile full --profile ops config >/dev/null
       - name: Validate Prometheus configuration and rules
-        run: docker run --rm -v "$PWD/infra/prometheus:/etc/prometheus:ro" prom/prometheus:v3.5.0 promtool check config /etc/prometheus/prometheus.yml
+        run: docker run --rm --entrypoint /bin/promtool -v "$PWD/infra/prometheus:/etc/prometheus:ro" prom/prometheus:v3.5.0 check config /etc/prometheus/prometheus.yml
       - name: Validate production compose
         run: docker compose -f docker-compose.yml -f docker-compose.production.yml config >/dev/null
         env:

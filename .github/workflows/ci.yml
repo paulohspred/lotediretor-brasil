@@ -29,6 +29,7 @@ jobs:
           python tests/validate_v20_municipality.py
           python tests/validate_v20_admin_saas.py
           python tests/validate_v20_municipality_factory.py
+          python tests/validate_v20_privacy.py
           node tests/test_v20_ai_runtime.js
           node tests/test_v20_ai_retrieval_context.js
           node tests/test_v20_ai_provenance_ids.js

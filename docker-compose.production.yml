@@ -102,6 +102,11 @@ services:
     - ./infra/caddy/Caddyfile.production:/etc/caddy/Caddyfile:ro
     - caddy_data:/data
     - caddy_config:/config
+  opensearch:
+    # Search remains internal to the Compose network. Publishing 9200 on the
+    # production host would bypass the gateway and the application ACL/tenant
+    # boundary even when the Docker network itself is private.
+    ports: []
   prometheus:
     ports: []
   grafana:

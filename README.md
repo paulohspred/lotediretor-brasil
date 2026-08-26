@@ -1,56 +1,111 @@
-# LoteDiretor SaaS v19-rc.3
+# LoteDiretor Brasil — v20 pre-homologação
 
-Checkpoint cumulativo do **LoteDiretor Brasil**, implementado contra o Blueprint Final v2.0. A RC3 aprofunda o núcleo que precisa ser confiável antes de ampliar módulos: Core Territorial/Legal, AI Knowledge Plane, laboratório municipal de São Paulo, A.I TEC geometry-aware e Energia Solar com dimensionamento elétrico preliminar baseado em dados explícitos.
+Implementação cumulativa do **LoteDiretor Brasil** contra o Blueprint Final v2.0. O branch v20 atual consolida Core Territorial/Legal, Imóvel 360/Rural, Condomínio, Energia Solar, A.I TEC, Prefeitura, Admin SaaS, Municipality Factory, AI Knowledge Plane e os gates operacionais necessários antes da homologação final.
 
-## Implementado nesta RC
+`productionHomologated=false` permanece obrigatório. Fixtures locais, dados sintéticos, testes Docker e contratos de staging/release não são evidência de fonte oficial, pentest independente, revisão profissional ou infraestrutura de produção.
 
-### A.I TEC — Site/Access/Parking/Program/Terrain/Building
-- Site Solver determinístico e reproduzível por `seed`;
-- envelope métrico e hard constraints de CA, TO, TP e altura;
-- estacionamento de superfície com `PARKING_STALL` e `DRIVE_AISLE`;
-- acesso fornecido explicitamente pelo usuário e viário interno conceitual, sem inventar frente de rua;
-- `lock + branch + regenerate` preservando footprints travados;
-- unit mix determinístico com mínimos tratados como program gate;
-- estimativa conceitual de cut/fill somente quando existem amostras XYZ explícitas;
-- Building Solver preliminar com floor plate, core e circulação;
-- persistência de soluções, geometrias, violações, locks, análises e artefatos;
-- exportação de solução em GeoJSON e métricas em CSV;
-- Pareto apenas entre alternativas que passaram as restrições duras computáveis.
+## Desenvolvimento local
 
-### Energia Solar — elétrica preliminar
-- dimensionamento de strings/MPPT a partir de datasheet explícito;
-- correção de Voc/Vmp por temperatura;
-- verificação de janela MPPT, tensão DC máxima, corrente por MPPT e limite DC do inversor;
-- ausência de especificação retorna `REQUIRES_INPUT` em vez de completar valores por suposição;
-- resultados persistidos como `solar.electrical_design` com provenance/review fields;
-- correção da unicidade global/tenant de `solar.regulation_snapshot` quando `tenant_id` é `NULL`.
+O caminho mais simples usa Docker Compose. `docker-compose.override.yml` é carregado automaticamente no desenvolvimento e inclui o `aitec-worker`, portanto jobs A.I TEC persistidos não ficam sem consumidor.
 
-### AI Core / Knowledge Plane
-- corpus público, institucional e privado com autorização pré-retrieval;
-- bitemporalidade jurídica e de conhecimento;
-- lexical + vector opcional + RRF + reranking;
-- Prompt/Tool Registry versionado;
-- evidence allowlist, abstenção e gate de alto risco baseado em regra `CONFIRMED`;
-- page-aware semantic chunks e invalidação/reindexação por mudança de fonte.
+```bash
+docker compose up -d --build
+docker compose ps
+```
 
-### São Paulo / dados municipais
-- profile oficial para lote fiscal e zoneamento GeoSampa;
-- WFS com CRS solicitado explicitamente;
-- publicação por dataset e promoção controlada para `geo.parcel` e `planning.zone`;
-- ferramenta `inspect-wfs` não depende mais de PostgreSQL/psycopg para inspeção de fonte;
-- comandos que realmente escrevem no banco exigem explicitamente `PLATFORM_DATABASE_URL` e driver;
-- falhas de inspeção são emitidas em JSON legível, sem traceback operacional desnecessário.
+Para desmontar incluindo volumes locais:
 
-## Validação local
+```bash
+docker compose down -v --remove-orphans
+```
+
+Credenciais/defaults desse modo são **fixtures de desenvolvimento** e não devem ser reutilizados em staging ou produção.
+
+## Validação estática
 
 ```bash
 ./validate-v19-rc3.sh
+python tests/validate_v20_core_legal.py
+python tests/validate_v20_aitec_advanced.py
+python tests/validate_v20_solar.py
+python tests/validate_v20_property_rural.py
+python tests/validate_v20_condo.py
+python tests/validate_v20_municipality.py
+python tests/validate_v20_admin_saas.py
+python tests/validate_v20_municipality_factory.py
+python tests/validate_v20_privacy.py
+python tests/test_v20_dr_contract.py
+python tests/test_v20_cortex_qualification.py
+python tests/test_v20_supply_chain.py
 ```
 
-O gate cobre regressões v15–v19, Core/Legal, AI, São Paulo, A.I TEC RC/RC2/RC3, Solar RC3, Python, JSON/YAML, TypeScript/TSX sintático, shell, drift de versão e contratos de migrations. Consulte `VALIDATION.md` para o que foi e o que não foi executado.
+O workflow `.github/workflows/ci.yml` executa também lockfile/npm, typecheck/build, contratos AI, Compose, Prometheus, production parity, staging parity estrutural, SBOM/supply-chain, release imutável e rollback self-test.
 
-## Estado de produção
+## Qualificação local final para Cortex
 
-**Não homologado para produção.** Este checkpoint não fabrica evidência para gates que dependem de infraestrutura indisponível neste ambiente. Continuam obrigatórios: lockfile real + `npm ci/typecheck/build`, PostgreSQL/PostGIS real, Docker E2E, OpenSearch/embeddings/provider reais, GeoSampa ao vivo + golden lots humanos, browser E2E/a11y, pentest, staging/carga/canary e backup/restore/DR.
+A qualificação principal é executada inteiramente com Docker:
 
-Consulte `STATUS.md`, `VALIDATION.md`, `REPAIR_NOTES.md`, `PROGRESS.json` e `docs/architecture/V19_RC3_IMPLEMENTATION_REPORT.md`.
+```bash
+bash ops/cortex/qualify-local.sh ci
+```
+
+Perfis prolongados:
+
+```bash
+bash ops/cortex/qualify-local.sh soak
+bash ops/cortex/qualify-local.sh capacity
+```
+
+O harness executa, registra duração/status e preserva evidências para:
+
+- production/staging structural parity, promoção imutável e rollback contract;
+- build/health/smoke;
+- A.I TEC runtime + fila persistida;
+- RLS cross-tenant;
+- LGPD/retenção/legal hold;
+- Municipality Factory;
+- OpenSearch/AI tenant-public-temporal isolation;
+- OIDC real via Keycloak;
+- browser desktop/mobile e axe WCAG A/AA;
+- jornadas `análise → relatório`, `billing → entitlement`, `condo upload → chat` e `A.I TEC job`;
+- security baseline;
+- supply-chain inventory + CycloneDX SBOM;
+- k6 `ci/soak/capacity`;
+- fault injection e recuperação;
+- métricas/traces/logs/alertas;
+- backup/restore de PostgreSQL e object storage, com RPO/RTO sintéticos locais.
+
+Artefatos ficam em `runtime-artifacts/cortex/<timestamp>/`, incluindo `gate-status.tsv`, `qualification-report.json`, `qualification-report.md` e `evidence-manifest.json`.
+
+Consulte `docs/CORTEX_LOCAL_QUALIFICATION.md` para o procedimento detalhado.
+
+## Release e produção
+
+O modelo de promoção usa `docker-compose.production.yml` + `docker-compose.release.yml`. Os serviços próprios são promovidos por referências imutáveis `image@sha256`; `platform-migrate` e `control-migrate` reutilizam exatamente os mesmos artefatos das APIs correspondentes. O ambiente de aplicação não recebe DSNs de migration-owner.
+
+O repositório contém contratos executáveis para:
+
+- production parity;
+- staging parity estrutural;
+- SBOM/supply-chain;
+- canary com health + AI eval + carga;
+- rollback candidato → digest anterior;
+- SLOs/alertas/runbooks;
+- backup/restore e DR sintético local.
+
+Essas capacidades não equivalem a execução real no ambiente final.
+
+## Gates que continuam externos
+
+Mesmo com a qualificação local integralmente verde, **não** marcar produção como homologada sem evidência real para:
+
+- pentest independente e fechamento de todos os achados Critical/High;
+- staging/cloud equivalente à produção e escolha formal do provedor/IaC;
+- TLS/IAM/secrets/DNS/registry reais;
+- canary e rollback executados no ambiente final;
+- PITR/failover/HA/DR reais com RPO/RTO medidos;
+- fontes oficiais, licenças e providers reais;
+- golden lots e revisão jurídica/arquitetônica/engenharia/fiscal/institucional;
+- proteção administrativa da branch `main`.
+
+Consulte `STATUS.md`, `PROGRESS.json`, `VALIDATION.md`, `docs/V20_ACCEPTANCE_MATRIX.md`, `docs/architecture/BLUEPRINT_V20_GAP_MATRIX.md` e o issue #13 para o estado de homologação.

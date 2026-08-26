@@ -12,7 +12,7 @@ jobs:
       - uses: actions/setup-python@v5
         with: {python-version: '3.13'}
       - name: Install Python validation dependencies
-        run: pip install PyYAML reportlab requests shapely pyproj pypdf fastapi pydantic boto3 "psycopg[binary]"
+        run: pip install PyYAML reportlab requests shapely pyproj pypdf fastapi pydantic boto3 prometheus-client "psycopg[binary]"
       - name: Install Node workspaces reproducibly
         run: npm ci --workspaces --include-workspace-root --no-audit --no-fund
       - name: Run RC3 validation

@@ -98,6 +98,7 @@ services:
       PLATFORM_DATABASE_URL: postgresql://lotediretor_worker:${PLATFORM_DB_WORKER_PASSWORD:?required}@platform-db:5432/${PLATFORM_DB_NAME:?required}
       AITEC_ENGINE_INTERNAL_URL: ${AITEC_ENGINE_INTERNAL_URL:-http://aitec-engine:8002}
       INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN:?required}
+      AITEC_METRICS_PORT: ${AITEC_METRICS_PORT:-9104}
     depends_on:
       platform-db:
         condition: service_healthy
@@ -105,6 +106,15 @@ services:
         condition: service_completed_successfully
       aitec-engine:
         condition: service_healthy
+    healthcheck:
+      test:
+      - CMD
+      - python
+      - -c
+      - import urllib.request; urllib.request.urlopen('http://127.0.0.1:9104/metrics',timeout=3)
+      interval: 10s
+      timeout: 5s
+      retries: 12
   gateway:
     ports: !override
     - 80:80

@@ -17,7 +17,7 @@ permissions:
 jobs:
   docker-runtime:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 70
     env:
       COMPOSE_PROJECT_NAME: lotediretor_ci
       COMPOSE_FILE: docker-compose.yml:docker-compose.ci.yml:docker-compose.ops.yml
@@ -56,6 +56,8 @@ jobs:
       GRAFANA_ADMIN_PASSWORD: ci-grafana-admin-2026
       BACKUP_DIR: ./backups-ci
       BACKUP_RETENTION_DAYS: 0
+      SECURITY_ARTIFACT_DIR: ./runtime-artifacts/security
+      RESILIENCE_ARTIFACT_DIR: ./runtime-artifacts/resilience
 
     steps:
       - uses: actions/checkout@v4
@@ -115,13 +117,19 @@ jobs:
       - name: Prove browser OIDC mobile and accessibility journeys
         run: bash ./ops/browser/run-e2e.sh
 
-      - name: Prove observability components targets probes and rules
-        run: bash ./ops/observability/runtime-gate.sh
+      - name: Prove runtime security boundaries
+        run: bash ./ops/security/runtime-baseline.sh
 
       - name: Run short multi-service load regression gate
         env:
           LOAD_PROFILE: ci
         run: bash ./ops/load/run.sh
+
+      - name: Prove controlled service failure and recovery
+        run: bash ./ops/resilience/runtime-fault-injection.sh
+
+      - name: Prove observability targets probes and rules after recovery
+        run: bash ./ops/observability/runtime-gate.sh
 
       - name: Run backup and restore drill
         run: |

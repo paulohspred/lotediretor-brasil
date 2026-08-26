@@ -55,6 +55,7 @@ jobs:
       BACKUP_RETENTION_DAYS: 0
       SECURITY_ARTIFACT_DIR: ./runtime-artifacts/security
       RESILIENCE_ARTIFACT_DIR: ./runtime-artifacts/resilience
+      DR_ARTIFACT_DIR: ./runtime-artifacts/dr
 
     steps:
       - uses: actions/checkout@v4
@@ -111,14 +112,19 @@ jobs:
       - name: Prove OpenSearch ingest and retrieval isolation
         run: ./ops/ai/runtime-integration.sh
 
+      - name: Prove runtime AI prompt-injection tenant and tool boundaries
+        run: bash ./ops/security/ai-redteam-runtime.sh
+
       - name: Seed explicitly synthetic browser critical-journey fixtures
         run: bash ./ops/browser/seed-critical-journeys.sh
 
       - name: Prove browser OIDC mobile accessibility and critical business journeys
         run: bash ./ops/browser/run-e2e.sh
 
-      - name: Prove runtime security boundaries
-        run: bash ./ops/security/runtime-baseline.sh
+      - name: Prove runtime security boundaries and supply chain
+        run: |
+          bash ./ops/security/runtime-baseline.sh
+          python3 ./ops/security/supply-chain.py
 
       - name: Run short multi-service load regression gate
         env:

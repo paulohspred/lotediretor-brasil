@@ -6,10 +6,11 @@ report=(root/'ops/cortex/qualification-report.py').read_text()
 manifest=(root/'ops/cortex/evidence-manifest.py').read_text()
 security=(root/'ops/security/runtime-baseline.sh').read_text()
 redteam=(root/'ops/security/ai-redteam-runtime.sh').read_text()
+trivy=(root/'ops/security/trivy-scan.sh').read_text()
 
 required=[
  'production_parity','staging_parity','immutable_release','rollback_contract',
- 'compose_model','build_images','stack_health','runtime_smoke','aitec_runtime',
+ 'compose_model','build_images','security_trivy','stack_health','runtime_smoke','aitec_runtime',
  'rls_isolation','privacy_lgpd','municipality_factory','ai_retrieval','ai_redteam_runtime',
  'critical_fixture_seed','browser_critical','security_baseline','load_profile',
  'fault_injection','observability','backup','restore_dr',
@@ -21,12 +22,19 @@ for gate in required:
 for needle in [
  'qualification-report.py','evidence-manifest.py','gate-status.tsv',
  'production-parity.json','staging-parity.json','immutable-release.json','rollback-contract.txt',
- 'Final qualification report rejected a nominal PASS','full qualification will be rejected',
+ 'CORTEX_TRIVY','TRIVY_SCAN_IMAGES=1','full qualification will be rejected',
+ 'Final qualification report rejected a nominal PASS',
 ]:
-    assert needle in harness, f'harness missing final-report contract: {needle}'
+    assert needle in harness, f'harness missing final-report/security contract: {needle}'
 
 for needle in ['ops/security/supply-chain.py','supply-chain.json','sbom.cdx.json','supply_chain_inventory']:
     assert needle in security, f'security baseline missing supply-chain evidence: {needle}'
+
+for needle in [
+ 'aquasec/trivy:0.73.0','vuln,misconfig,secret','HIGH,CRITICAL','TRIVY_SCAN_IMAGES',
+ 'AUTOMATED_VULNERABILITY_SCAN_NOT_INDEPENDENT_PENTEST',
+]:
+    assert needle in trivy, f'Trivy gate missing contract: {needle}'
 
 for needle in [
  'providerConfigured=false','retrieved_prompt_injection','high_risk_without_confirmed_rule',
@@ -36,10 +44,12 @@ for needle in [
     assert needle in redteam, f'AI runtime redteam missing contract: {needle}'
 
 for needle in [
- 'production_parity','staging_parity','immutable_release','rollback_contract',
- 'playwright-results.json','k6-summary.json','security_baseline','ai_runtime_redteam','supply_chain_inventory','cyclonedx_sbom','observability_gate',
+ 'production_parity','staging_parity','immutable_release','rollback_contract','security_trivy',
+ 'playwright-results.json','k6-summary.json','security_baseline','trivy_scan','trivy-fs.json',
+ 'ai_runtime_redteam','supply_chain_inventory','cyclonedx_sbom','observability_gate',
+ 'AUTOMATED_VULNERABILITY_SCAN_NOT_INDEPENDENT_PENTEST','release_image_signature_provenance',
  'LOCAL_DETERMINISTIC_AI_REDTEAM_NOT_INDEPENDENT_PENTEST_OR_PROVIDER_REDTEAM','provider_specific_ai_redteam',
- 'LOCAL_SUPPLY_CHAIN_INVENTORY_NOT_VULNERABILITY_SCAN','vulnerability_image_signature_scan',
+ 'LOCAL_SUPPLY_CHAIN_INVENTORY_NOT_VULNERABILITY_SCAN',
  'dr_evidence','opensearch_health','ld-ai-b-leak.json',
  "'productionHomologated':False",
  'STRUCTURAL_STAGING_PARITY_CONTRACT_NOT_DEPLOYED_STAGING_EVIDENCE',
@@ -50,4 +60,4 @@ for needle in [
     assert needle in report, f'qualification report missing evidence/final gate: {needle}'
 
 assert 'productionHomologated remains false' in manifest
-print('v20 Cortex local + release/staging/supply-chain/AI-redteam evidence report contract OK')
+print('v20 Cortex local + release/staging/supply-chain/Trivy/AI-redteam evidence report contract OK')

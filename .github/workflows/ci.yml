@@ -34,6 +34,7 @@ jobs:
           python tests/test_v20_dr_contract.py
           python tests/test_v20_cortex_qualification.py
           python tests/test_v20_supply_chain.py
+          python tests/test_v20_critical_ui_contract.py
           node tests/test_v20_ai_runtime.js
           node tests/test_v20_ai_retrieval_context.js
           node tests/test_v20_ai_provenance_ids.js

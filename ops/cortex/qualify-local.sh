@@ -107,6 +107,9 @@ bash ./ops/aitec/runtime-integration.sh
 echo '==> Cross-tenant RLS isolation'
 bash ./ops/rls/runtime-isolation.sh
 
+echo '==> Privacy/LGPD RLS, legal hold and retention guards'
+bash ./ops/privacy/runtime-integration.sh
+
 echo '==> Municipality Factory guards/RLS'
 bash ./ops/municipality/factory-runtime.sh
 

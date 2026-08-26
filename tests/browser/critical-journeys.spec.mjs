@@ -43,6 +43,19 @@ async function pollReport(request,id,timeoutMs=60_000){
   throw new Error(`report did not complete within ${timeoutMs}ms; last=${JSON.stringify(last)}`);
 }
 
+async function pollCondoChat(request,condominiumId,message,timeoutMs=75_000){
+  const deadline=Date.now()+timeoutMs;
+  let last;
+  while(Date.now()<deadline){
+    last=await json(await request.post('/api/v1/ai/chat',{data:{
+      assistant:'condominio',subjectId:condominiumId,message,baseDate:'2026-08-26',retrievalTopK:12,
+    }}),'condo chat');
+    if(Number(last?.retrieval?.lexicalCount||0)>0||Number(last?.retrieval?.vectorCount||0)>0)return last;
+    await new Promise(resolve=>setTimeout(resolve,1500));
+  }
+  throw new Error(`condo document was not retrieved within ${timeoutMs}ms; last=${JSON.stringify(last)}`);
+}
+
 test('critical journey: real OIDC -> parcel analysis -> evidence -> generated report',async({page})=>{
   const request=await oidcLogin(page);
 
@@ -155,4 +168,48 @@ test('critical journey: billing settlement -> paid invoice -> platform entitleme
   const me=await json(await request.get('/api/v1/auth/me'),'auth me after entitlement sync');
   expect(me.entitlements.billing.invoiceId).toBe(invoice.id);
   expect(me.entitlements.tier).toBe('foundation');
+});
+
+test('critical journey: condo private upload -> ingest/index -> tenant-scoped chat',async({page})=>{
+  const request=await oidcLogin(page,{user:ADMIN});
+  const nonce=Date.now();
+  const marker=`AZULMAGNOLIA${nonce}`;
+
+  const condo=await json(await request.post('/api/v1/condominiums',{data:{
+    name:`Condomínio E2E ${nonce}`,kind:'VERTICAL',municipality:'3550308',
+  }}),'create condominium');
+  expect(condo.id).toBeTruthy();
+
+  const text=[
+    'REGIMENTO INTERNO SINTÉTICO PARA TESTE AUTOMATIZADO.',
+    `Marcador documental ${marker}.`,
+    'Visitantes devem utilizar exclusivamente a vaga identificada como V-07 durante a permanência no condomínio.',
+    'Este texto é fixture privado de E2E, não uma regra jurídica revisada ou fonte oficial.',
+  ].join('\n');
+  const file=await json(await request.post('/api/v1/files/upload',{multipart:{
+    file:{name:`regimento-${nonce}.txt`,mimeType:'text/plain',buffer:Buffer.from(text,'utf8')},
+  }}),'upload condo fixture');
+  expect(file.sha256).toMatch(/^[a-f0-9]{64}$/i);
+
+  const document=await json(await request.post(`/api/v1/condominiums/${condo.id}/documents`,{data:{
+    fileId:file.id,kind:'REGIMENTO_INTERNO',title:`Regimento E2E ${marker}`,
+  }}),'register condo document');
+  expect(document.id).toBeTruthy();
+  expect(document.processing_status).toBe('PENDING');
+
+  const chat=await pollCondoChat(request,condo.id,`No documento ${marker}, qual orientação aparece para visitantes?`);
+  expect(chat.assistant).toBe('condominio');
+  expect(Number(chat.retrieval.lexicalCount||0)+Number(chat.retrieval.vectorCount||0)).toBeGreaterThan(0);
+  expect(chat.retrieval.errors||[]).toEqual([]);
+
+  if(chat.status==='GROUNDED'){
+    expect(Array.isArray(chat.evidence_ids)).toBe(true);
+    expect(chat.evidence_ids.length).toBeGreaterThan(0);
+    expect(String(chat.answer||'').length).toBeGreaterThan(0);
+  }else{
+    expect(chat.status).toBe('ABSTAINED');
+    expect(chat.decision_status).toBe('NAO_DETERMINADO');
+    expect(chat.limitations).toContain('insufficient_grounding');
+    expect(chat.evidence_ids).toEqual([]);
+  }
 });

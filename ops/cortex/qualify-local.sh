@@ -34,7 +34,6 @@ export INTERNAL_API_TOKEN="${INTERNAL_API_TOKEN:-cortex-internal-api-token-local
 export KEYCLOAK_ADMIN="${KEYCLOAK_ADMIN:-cortex-admin}"
 export KEYCLOAK_ADMIN_PASSWORD="${KEYCLOAK_ADMIN_PASSWORD:-cortex-keycloak-admin-local}"
 export OIDC_CLIENT_ID="${OIDC_CLIENT_ID:-lotediretor-app}"
-# Must match infra/keycloak/realm-lotediretor.json for the local imported realm.
 export OIDC_CLIENT_SECRET="${OIDC_CLIENT_SECRET:-local-lotediretor-secret}"
 export SESSION_COOKIE_SECURE="${SESSION_COOKIE_SECURE:-false}"
 export ALLOW_LOCAL_AUTO_MEMBERSHIP="${ALLOW_LOCAL_AUTO_MEMBERSHIP:-true}"
@@ -143,6 +142,10 @@ if [[ "${CORTEX_RESET:-1}" == "1" ]]; then
   docker compose down -v --remove-orphans || true
 fi
 
+run_gate production_parity sh -c "python3 ops/security/production-parity.py > '$ARTIFACT_DIR/production-parity.json'"
+run_gate staging_parity sh -c "python3 ops/staging/production-equivalence.py > '$ARTIFACT_DIR/staging-parity.json'"
+run_gate immutable_release sh -c "python3 ops/release/immutable-release.py > '$ARTIFACT_DIR/immutable-release.json'"
+run_gate rollback_contract sh -c "bash ops/release/rollback-drill.sh --self-test > '$ARTIFACT_DIR/rollback-contract.txt'"
 run_gate compose_model sh -c "docker compose config > '$ARTIFACT_DIR/compose-config.yml'"
 run_gate build_images docker compose build
 

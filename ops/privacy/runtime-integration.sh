@@ -7,7 +7,14 @@ cat > "$OWNER_SQL" <<'SQL'
 BEGIN;
 INSERT INTO iam.organization(id,name,kind,status) VALUES
  ('0198f209-0000-7000-8000-000000000001','Privacy Runtime A','COMPANY','ACTIVE'),
- ('0198f209-0000-7000-8000-000000000002','Privacy Runtime B','COMPANY','ACTIVE') ON CONFLICT(id) DO NOTHING;
+ ('0198f209-0000-7000-8000-000000000002','Privacy Runtime B','COMPANY','ACTIVE'),
+ ('0198f209-0000-7000-8000-000000000003','Privacy Runtime Provisioning','COMPANY','ACTIVE') ON CONFLICT(id) DO NOTHING;
+DO $$ DECLARE n integer; BEGIN
+  SELECT count(*) INTO n FROM privacy.retention_policy
+  WHERE tenant_id='0198f209-0000-7000-8000-000000000003'
+    AND data_category IN ('AUDIT_TRAIL','LEGAL_EVIDENCE','SOURCE_PROVENANCE','IDENTITY_PROFILE');
+  IF n<>4 THEN RAISE EXCEPTION 'new tenant default retention provisioning expected 4 rows, got %',n; END IF;
+END $$;
 INSERT INTO iam.user_profile(id,email,display_name) VALUES
  ('0198f209-1000-7000-8000-000000000001','privacy-a@example.invalid','Privacy A'),
  ('0198f209-1000-7000-8000-000000000002','privacy-b@example.invalid','Privacy B')
@@ -83,4 +90,4 @@ ROLLBACK;
 SQL
 cat "$APP_SQL" | docker compose exec -T -e PGPASSWORD="$PLATFORM_DB_APP_PASSWORD" platform-db psql -h 127.0.0.1 -U "$PLATFORM_DB_APP_USER" -d "$PLATFORM_DB_NAME" -v ON_ERROR_STOP=1
 
-echo 'Privacy/LGPD runtime RLS + hold + append-only + retention guards PASS'
+echo 'Privacy/LGPD runtime RLS + provisioning + hold + append-only + retention guards PASS'

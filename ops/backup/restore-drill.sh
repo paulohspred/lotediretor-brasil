@@ -49,19 +49,29 @@ docker compose exec -T control-db createdb -U "$CONTROL_OWNER" "$CDB"
 cat "$SRC/platform.dump" | docker compose exec -T platform-db pg_restore -U "$PLATFORM_OWNER" -d "$PDB" --no-owner --no-acl
 cat "$SRC/control.dump" | docker compose exec -T control-db pg_restore -U "$CONTROL_OWNER" -d "$CDB" --no-owner --no-acl
 
-# Validate schema plus representative critical contracts after restore, not only
-# that pg_restore returned zero.
+# Validate representative critical contracts after restore and raise on any
+# missing relation. A boolean SELECT that merely prints false is not a gate.
 docker compose exec -T platform-db psql -v ON_ERROR_STOP=1 -U "$PLATFORM_OWNER" -d "$PDB" <<'SQL' >/dev/null
-select count(*) from public.schema_migrations;
-select to_regclass('iam.organization') is not null as iam_ok;
-select to_regclass('aitec.job') is not null as aitec_job_ok;
-select to_regclass('report.report_run') is not null as report_ok;
+DO $$
+DECLARE migrations integer;
+BEGIN
+  SELECT count(*) INTO migrations FROM public.schema_migrations;
+  IF migrations <= 0 THEN RAISE EXCEPTION 'platform schema_migrations empty after restore'; END IF;
+  IF to_regclass('iam.organization') IS NULL THEN RAISE EXCEPTION 'iam.organization missing after restore'; END IF;
+  IF to_regclass('aitec.job') IS NULL THEN RAISE EXCEPTION 'aitec.job missing after restore'; END IF;
+  IF to_regclass('report.report_run') IS NULL THEN RAISE EXCEPTION 'report.report_run missing after restore'; END IF;
+END $$;
 SQL
 docker compose exec -T control-db psql -v ON_ERROR_STOP=1 -U "$CONTROL_OWNER" -d "$CDB" <<'SQL' >/dev/null
-select count(*) from public.schema_migrations;
-select to_regclass('billing.invoice') is not null as billing_ok;
-select to_regclass('ops.backup_run') is not null as backup_evidence_ok;
-select to_regclass('ops.dr_drill') is not null as dr_evidence_ok;
+DO $$
+DECLARE migrations integer;
+BEGIN
+  SELECT count(*) INTO migrations FROM public.schema_migrations;
+  IF migrations <= 0 THEN RAISE EXCEPTION 'control schema_migrations empty after restore'; END IF;
+  IF to_regclass('billing.invoice') IS NULL THEN RAISE EXCEPTION 'billing.invoice missing after restore'; END IF;
+  IF to_regclass('ops.backup_run') IS NULL THEN RAISE EXCEPTION 'ops.backup_run missing after restore'; END IF;
+  IF to_regclass('ops.dr_drill') IS NULL THEN RAISE EXCEPTION 'ops.dr_drill missing after restore'; END IF;
+END $$;
 SQL
 
 # Prove object storage is restorable, not merely present in the backup directory.

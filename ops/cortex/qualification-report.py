@@ -23,6 +23,7 @@ external_gates = [
     {'gate':'production_like_staging','status':'NOT_HOMOLOGATED','reason':'structural staging parity is tested locally, but deployed cloud/network/provider equivalence still requires final-environment evidence'},
     {'gate':'live_canary_rollback','status':'NOT_HOMOLOGATED','reason':'repository contains executable canary/rollback contracts, but live execution is environment evidence'},
     {'gate':'production_ha_dr','status':'NOT_HOMOLOGATED','reason':'local DR evidence is synthetic; production RPO/RTO and PITR/failover require the final environment'},
+    {'gate':'vulnerability_image_signature_scan','status':'NOT_HOMOLOGATED','reason':'local CycloneDX inventory is generated, but final CVE policy, image signature and provenance-attestation verification require the release registry/scanner'},
     {'gate':'official_sources_and_providers','status':'NOT_HOMOLOGATED','reason':'live credentials, licenses, municipal/official datasets and provider evidence remain external'},
     {'gate':'professional_institutional_review','status':'NOT_HOMOLOGATED','reason':'legal/architecture/engineering/fiscal/institutional approvals cannot be synthesized by local automation'},
     {'gate':'main_branch_protection','status':'NOT_HOMOLOGATED','reason':'requires repository administration/ruleset configuration outside this qualification run'},
@@ -75,7 +76,9 @@ checks.append(file_check('platform_migrations',artifact/'platform-migrations.txt
 checks.append(file_check('control_migrations',artifact/'control-migrations.txt',lambda v,p:(bool(p.read_text().strip()),'non-empty migration ledger')))
 checks.append(file_check('playwright_results',artifact/'browser'/'playwright-results.json',lambda v,p:(isinstance(v,dict) and int((v.get('stats') or {}).get('unexpected',0))==0 and int((v.get('stats') or {}).get('expected',0))>0,f"stats={(v or {}).get('stats') if isinstance(v,dict) else None}")))
 checks.append(file_check('k6_summary',artifact/'load'/'k6-summary.json'))
-checks.append(file_check('security_baseline',artifact/'security'/'result.json',lambda v,p:(isinstance(v,dict) and v.get('status')=='PASS',f"status={v.get('status') if isinstance(v,dict) else None}")))
+checks.append(file_check('security_baseline',artifact/'security'/'result.json',lambda v,p:(isinstance(v,dict) and v.get('status')=='PASS' and 'supply_chain_inventory' in (v.get('checks') or []),f"checks={v.get('checks') if isinstance(v,dict) else None}")))
+checks.append(file_check('supply_chain_inventory',artifact/'security'/'supply-chain.json',lambda v,p:(isinstance(v,dict) and v.get('status')=='PASS' and v.get('classification')=='LOCAL_SUPPLY_CHAIN_INVENTORY_NOT_VULNERABILITY_SCAN' and not (v.get('errors') or []),f"components={v.get('components') if isinstance(v,dict) else None} warnings={len(v.get('warnings') or []) if isinstance(v,dict) else None}")))
+checks.append(file_check('cyclonedx_sbom',artifact/'security'/'sbom.cdx.json',lambda v,p:(isinstance(v,dict) and v.get('bomFormat')=='CycloneDX' and v.get('specVersion')=='1.5' and len(v.get('components') or [])>0,f"components={len(v.get('components') or []) if isinstance(v,dict) else None}")))
 checks.append(file_check('observability_gate',artifact/'observability'/'observability-gate.json',lambda v,p:(isinstance(v,dict) and v.get('status')=='PASS',f"status={v.get('status') if isinstance(v,dict) else None}")))
 checks.append(file_check('resilience_events',artifact/'resilience'/'events.tsv',lambda v,p:(len([x for x in p.read_text().splitlines() if x.strip()])>=6,'fault/recovery event ledger present')))
 

@@ -47,10 +47,28 @@ python -m py_compile $(find services workers tests ops -name '*.py' -not -path '
 python - <<'PY'
 from pathlib import Path
 import json,yaml
+
+class ComposeSafeLoader(yaml.SafeLoader):
+    pass
+
+def compose_tag(loader, node):
+    if isinstance(node, yaml.ScalarNode):
+        return loader.construct_scalar(node)
+    if isinstance(node, yaml.SequenceNode):
+        return loader.construct_sequence(node)
+    if isinstance(node, yaml.MappingNode):
+        return loader.construct_mapping(node)
+    raise TypeError(f'Unsupported YAML node for Compose tag: {type(node).__name__}')
+
+# Docker Compose defines these tags for merge semantics. They are valid Compose
+# YAML and must not make the generic syntax guard reject release overlays.
+ComposeSafeLoader.add_constructor('!reset', compose_tag)
+ComposeSafeLoader.add_constructor('!override', compose_tag)
+
 for p in Path('.').rglob('*'):
     if not p.is_file() or 'node_modules' in p.parts or '__pycache__' in p.parts: continue
     if p.suffix=='.json': json.loads(p.read_text())
-    elif p.suffix in ('.yaml','.yml'): yaml.safe_load(p.read_text())
+    elif p.suffix in ('.yaml','.yml'): yaml.load(p.read_text(), Loader=ComposeSafeLoader)
 print('JSON/YAML OK')
 PY
 

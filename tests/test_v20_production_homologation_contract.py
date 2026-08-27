@@ -17,7 +17,7 @@ for name in required:
     assert template['gates'][name]['status']=='PENDING', f'template must not pre-approve {name}'
 
 for needle in [
- 'lotediretor-production-homologation-v1','candidateCommit','releaseImages','image@sha256',
+ 'lotediretor-production-homologation-v1','candidateCommit','releaseImages','@sha256:','DIGEST_RE.fullmatch',
  'productionHomologated must be true','gate not PASS','gate missing evidenceRef','gate missing owner',
  'non-production evidence classification','approval.approvedBy','approval.changeTicket','--self-test',
 ]:

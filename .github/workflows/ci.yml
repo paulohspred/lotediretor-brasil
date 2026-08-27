@@ -12,7 +12,7 @@ jobs:
       - uses: actions/setup-python@v5
         with: {python-version: '3.13'}
       - name: Install Python validation dependencies
-        run: pip install PyYAML reportlab requests shapely pyproj pypdf fastapi pydantic boto3 "psycopg[binary]"
+        run: pip install PyYAML reportlab requests shapely pyproj pypdf fastapi pydantic boto3 prometheus-client "psycopg[binary]"
       - name: Install Node workspaces reproducibly
         run: npm ci --workspaces --include-workspace-root --no-audit --no-fund
       - name: Run RC3 validation
@@ -23,43 +23,82 @@ jobs:
           python tests/test_sao_paulo_v20_streaming_sync.py
           python tests/validate_v20_ai_core_runtime.py
           python tests/validate_v20_aitec_advanced.py
+          python tests/test_v20_aitec_worker.py
           python tests/validate_v20_solar.py
           python tests/validate_v20_property_rural.py
           python tests/validate_v20_condo.py
           python tests/validate_v20_municipality.py
           python tests/validate_v20_admin_saas.py
           python tests/validate_v20_municipality_factory.py
+          python tests/validate_v20_privacy.py
+          python tests/test_v20_dr_contract.py
+          python tests/test_v20_cortex_qualification.py
+          python tests/test_v20_supply_chain.py
+          python tests/test_v20_critical_ui_contract.py
+          python tests/test_v20_release_signature_contract.py
           node tests/test_v20_ai_runtime.js
           node tests/test_v20_ai_retrieval_context.js
           node tests/test_v20_ai_provenance_ids.js
+          node tests/test_v20_ai_gateway_telemetry.js
           node tests/test_v20_ai_redteam_eval.js
+          node tests/test_v20_aitec_job_contract.js
       - name: Typecheck
         run: npm run typecheck
       - name: Build
         run: npm run build
-      - name: Validate development compose
-        run: docker compose -f docker-compose.yml config >/dev/null
-      - name: Validate production compose
-        run: docker compose -f docker-compose.yml -f docker-compose.production.yml config >/dev/null
+      - name: Validate default development compose
+        run: |
+          docker compose config >/dev/null
+          docker compose config --services | grep -qx 'aitec-worker'
+      - name: Validate full observability compose
+        run: |
+          docker compose -f docker-compose.yml -f docker-compose.ci.yml -f docker-compose.ops.yml --profile full --profile ops config >/dev/null
+          docker compose -f docker-compose.yml -f docker-compose.ci.yml -f docker-compose.ops.yml --profile full --profile ops config --services | grep -qx 'aitec-worker'
+      - name: Validate Prometheus configuration and rules
+        run: docker run --rm --entrypoint /bin/promtool -v "$PWD/infra/prometheus:/etc/prometheus:ro" prom/prometheus:v3.5.0 check config /etc/prometheus/prometheus.yml
+      - name: Validate rendered production parity
+        run: python3 ops/security/production-parity.py
+      - name: Generate and validate supply-chain inventory and CycloneDX SBOM
         env:
-          PUBLIC_DOMAIN: app.test.invalid
-          AUTH_DOMAIN: auth.test.invalid
-          ACME_EMAIL: ci@example.invalid
+          SECURITY_ARTIFACT_DIR: /tmp/lotediretor-supply-chain
+        run: |
+          python3 ops/security/supply-chain.py
+          test -s /tmp/lotediretor-supply-chain/supply-chain.json
+          test -s /tmp/lotediretor-supply-chain/sbom.cdx.json
+      - name: Validate immutable staging candidate equivalence
+        run: python3 ops/staging/production-equivalence.py
+      - name: Validate immutable release promotion model
+        run: python3 ops/release/immutable-release.py
+      - name: Validate rollback contract and candidate/previous digest comparison
+        run: bash ops/release/rollback-drill.sh --self-test
+      - name: Validate release signature and SLSA provenance contract
+        run: bash ops/release/verify-signatures.sh --self-test
+      - name: Validate production compose
+        run: |
+          docker compose -f docker-compose.yml -f docker-compose.production.yml --profile full --profile ops config >/dev/null
+          docker compose -f docker-compose.yml -f docker-compose.production.yml --profile full --profile ops config --services | grep -qx 'aitec-worker'
+        env:
+          PUBLIC_DOMAIN: app.example.com
+          AUTH_DOMAIN: auth.example.com
+          ACME_EMAIL: ci@example.com
           KEYCLOAK_ADMIN: ci
-          KEYCLOAK_ADMIN_PASSWORD: ci-ci-ci-ci
-          OIDC_CLIENT_SECRET: ci-ci-ci-ci-ci
-          INTERNAL_API_TOKEN: ci-ci-ci-ci-ci
-          PLATFORM_DB_MIGRATION_USER: lotediretor
-          PLATFORM_DB_MIGRATION_PASSWORD: ci-platform-owner
+          KEYCLOAK_ADMIN_PASSWORD: ci-keycloak-production-fixture-2026
+          OIDC_CLIENT_SECRET: ci-oidc-production-fixture-2026
+          INTERNAL_API_TOKEN: ci-internal-production-fixture-2026
+          PLATFORM_DB_MIGRATION_USER: ld_platform_migration
+          PLATFORM_DB_MIGRATION_PASSWORD: ci-platform-owner-2026
           PLATFORM_DB_NAME: lotediretor
-          PLATFORM_DB_APP_PASSWORD: ci-platform-app
-          PLATFORM_DB_TILES_PASSWORD: ci-tiles
-          PLATFORM_DB_EVENT_PASSWORD: ci-platform-event
-          PLATFORM_DB_WORKER_PASSWORD: ci-platform-worker
-          CONTROL_DB_MIGRATION_USER: lotediretor_control
-          CONTROL_DB_MIGRATION_PASSWORD: ci-control-owner
+          PLATFORM_DB_APP_USER: ld_platform_app
+          PLATFORM_DB_APP_PASSWORD: ci-platform-app-2026
+          PLATFORM_DB_TILES_USER: ld_tiles
+          PLATFORM_DB_TILES_PASSWORD: ci-tiles-2026
+          PLATFORM_DB_EVENT_PASSWORD: ci-platform-event-2026
+          PLATFORM_DB_WORKER_PASSWORD: ci-platform-worker-2026
+          CONTROL_DB_MIGRATION_USER: ld_control_migration
+          CONTROL_DB_MIGRATION_PASSWORD: ci-control-owner-2026
           CONTROL_DB_NAME: lotediretor_control
-          CONTROL_DB_APP_PASSWORD: ci-control-app
-          CONTROL_DB_WORKER_PASSWORD: ci-control-worker
+          CONTROL_DB_APP_USER: ld_control_app
+          CONTROL_DB_APP_PASSWORD: ci-control-app-2026
+          CONTROL_DB_WORKER_PASSWORD: ci-control-worker-2026
           S3_ACCESS_KEY: ci
-          S3_SECRET_KEY: ci-ci-ci-ci-ci
+          S3_SECRET_KEY: ci-object-production-fixture-2026

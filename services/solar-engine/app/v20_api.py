@@ -7,7 +7,7 @@ from typing import Any, Callable
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
-from . import v20
+from . import v20, v20_advanced
 
 
 @dataclass(frozen=True)
@@ -20,10 +20,15 @@ REGISTRY: dict[str, Operation] = {
     'source.validate': Operation(v20.validate_source_snapshot,'provenance'),
     'dsm.roof-surfaces': Operation(v20.segment_roof_surfaces,'geometry'),
     'dsm.obstacles': Operation(v20.detect_dsm_obstacles,'geometry'),
+    'solar.position': Operation(v20_advanced.solar_position,'solar-geometry'),
+    'irradiance.poa': Operation(v20_advanced.plane_of_array_irradiance,'solar-resource'),
     'shadow.project': Operation(v20.project_shadows,'solar-geometry'),
+    'roof.layout': Operation(v20_advanced.roof_rect_layout,'layout'),
+    'electrical.string-mppt': Operation(v20_advanced.string_mppt_design,'electrical'),
     'energy.irradiance': Operation(v20.energy_from_irradiance,'energy'),
     'battery.simulate': Operation(v20.simulate_battery,'storage'),
     'tariff.apply': Operation(v20.apply_tariff_snapshot,'tariff'),
+    'financial.project': Operation(v20_advanced.financial_projection,'finance'),
     'connection.precheck': Operation(v20.connection_precheck,'grid'),
     'ground-mount.layout': Operation(v20.ground_mount_layout,'ground-mount'),
     'safety.conditioning': Operation(v20.safety_conditioning,'safety'),

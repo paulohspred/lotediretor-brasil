@@ -2,63 +2,81 @@
 
 Data da consolidação: 2026-08-26.
 
-Esta evidência usa estados independentes para **implementação**, **validação estática/CI**, **validação runtime** e **homologação externa/profissional**. Código existente, fixture sintética ou um runtime local verde não substituem fonte oficial, credencial externa, revisão profissional ou gate de produção. `productionHomologated = false`.
+Esta evidência mantém estados independentes para **implementação**, **validação executada**, **runtime** e **homologação externa/profissional**. Código existente, fixture sintética, SBOM, scan automatizado ou runtime local verde não substituem fonte oficial, credencial externa, revisão profissional ou gate de produção. `productionHomologated = false`.
 
-## Baseline consolidado
+## Baseline consolidado e realmente verde
 
-O baseline runtime consolidado é `42ac9a13ccb726f68e48a62be75e7d5bec1ffaa7`, merge do PR #66 em `develop`.
+O baseline validado em `develop` é `52ed13cc37109c02016b513113b13ab951c3bc9a`, merge do PR #67.
 
-O PR #66 fechou o incremento de Municipality Factory e a race de search-readiness do AI ingest. O worker agora usa OpenSearch `refresh=wait_for` antes de marcar `ingest.document_text.indexed_at`; portanto o estado do PostgreSQL não pode declarar um chunk indexado enquanto ele ainda estiver invisível para `_search`.
+Validação desse baseline:
 
-Validação do head do PR #66:
+- `ci` run #469 → **PASS**;
+- `runtime-e2e` run #62 → **PASS**.
 
-- `ci` run #456 → **PASS**;
-- `runtime-e2e` run #60 → **PASS**;
-- artefato runtime `9602867789` gerado e preservado pelo workflow.
+O PR #67 sucede o PR #66 e mantém a correção da race de search-readiness do AI ingest: OpenSearch usa `refresh=wait_for` antes de `ingest.document_text.indexed_at`, impedindo PostgreSQL de declarar search-ready um chunk ainda invisível a `_search`.
+
+## Candidato pré-Cortex — PR #68
+
+O PR #68 concentra os gates implementáveis de go-live. O código está em estado **pre-Cortex code-complete**, porém o candidato **não está validado** enquanto os GitHub-hosted jobs terminarem antes de executar steps (`steps=[]`, sem logs de job).
+
+Implementado no candidato:
+
+- Playwright real com Keycloak/OIDC, desktop/mobile e axe WCAG A/AA;
+- quatro jornadas críticas exigidas pelo Blueprint: `resolver → análise → relatório`, `billing → entitlement`, `condo upload → chat` e `A.I TEC job`;
+- A.I TEC job persistido assíncrono, worker, RLS, idempotência, allowlist, retry/backoff, stale reclaim, métricas, alertas e fault recovery;
+- AI retrieval tenant/public/temporal, provenance, RED/OTLP e red-team determinístico contra prompt injection, tenant leakage, high-risk e tool/action boundaries;
+- privacy/LGPD com retenção, legal hold, requests do titular, erasure/export, session revocation e append-only evidence;
+- k6 `ci/soak/capacity` multi-serviço;
+- RED/OTLP dos cinco serviços HTTP, Prometheus/Grafana/Loki/Tempo/Promtail/Alertmanager/blackbox e SLIs da fila A.I TEC;
+- fault injection controlado;
+- production parity, structural staging parity, promoção `image@sha256`, rollback self-test e canary com AI eval;
+- supply-chain inventory + CycloneDX 1.5 SBOM e guard de imagens flutuantes;
+- Trivy 0.73.0 para filesystem/dependências/misconfiguration/secrets e scan de imagens locais no Cortex, bloqueando HIGH/CRITICAL corrigíveis;
+- backup/restore de PostgreSQL e object storage com checksums, assertions de schema e RPO/RTO sintéticos locais;
+- `ops/cortex/qualify-local.sh` com ledger de gates, `qualification-report.json/.md` e `evidence-manifest.json`.
+
+Esses itens estão **implementados, não homologados** até que o head correspondente execute e produza evidência verde.
 
 ## CI e regressão
 
-A superfície histórica `validate-v19-rc3.sh` continua obrigatória durante o desenvolvimento v20. GitHub Actions executa `npm ci` com lockfile versionado, regressões RC3, validators v20, typecheck, builds e validação dos modelos Compose.
+A superfície histórica `validate-v19-rc3.sh` continua obrigatória durante v20. O CI do candidato também inclui validators v20, typecheck, builds, Compose local/full/produção, Prometheus rules, production parity, staging parity estrutural, immutable release/rollback e supply-chain contracts.
 
-O Core Territorial/Legal possui corpus golden v20 sintético e versionado que executa o comportamento real do engine para `PERMITTED`, `PROHIBITED`, `UNKNOWN`, conflitos, vigência temporal, recuo dependente de altura, CEPAC, TDC e bloqueio de regra `CANDIDATE`. Isso prova regressão determinística, não legislação municipal.
+O Core Territorial/Legal mantém corpus golden v20 sintético e versionado para `PERMITTED`, `PROHIBITED`, `UNKNOWN`, conflitos, temporalidade, recuo dependente de altura, CEPAC, TDC e bloqueio de regra `CANDIDATE`. Isso é regressão determinística, não legislação municipal homologada.
 
-## Runtime local/reproduzível — PASS
+## Runtime baseline comprovado
 
-O runtime #60 executou em runner GitHub limpo:
+O runtime #62 é a evidência mergeada mais recente. Ele sucede o runtime #60 e mantém full-stack build/startup, migrations, service smoke, A.I TEC runtime, non-owner RLS, Municipality Factory guards e OpenSearch/AI isolation.
 
-- reclaim e verificação de disco do runner;
-- build reproduzível das imagens de aplicação;
-- `docker compose` full-stack e health dos serviços;
-- migrations PostgreSQL/PostGIS;
-- smoke de gateway e serviços roteados;
-- A.I TEC v20 advanced runtime API;
-- isolamento RLS cross-tenant com role de aplicação não-owner;
-- Municipality Factory DB guards e tenant isolation;
-- OpenSearch real e bootstrap do índice de evidências;
-- ai-ingest real e retrieval pelo caminho OpenSearch → AI Gateway → Caddy;
-- backup + restore drill;
-- captura de diagnóstico e cleanup do stack.
-
-O artefato do run #60 mostra o cluster OpenSearch `yellow`, esperado no CI single-node com réplica não alocada, mas com primárias ativas e runtime aprovado. A busca privada do tenant A retorna o chunk `0198f020-1000-7000-8000-000000000001`; a consulta pelo segredo do tenant B não retorna o documento B; o documento público municipal é recuperado somente quando `includePublic=true`; e a regra com vigência a partir de 2099 não é retornada para `baseDate=2026-08-23`.
+Em evidências CI single-node, OpenSearch `yellow` com primárias ativas é aceitável para o gate local e não é tratado como HA de produção. Tenant/private/public/temporal retrieval permanecem critérios separados de health do cluster.
 
 ## AI lifecycle/evals
 
-O índice usa schema `evidence-v20.1`, fingerprint estável do espaço vetorial por modelo/revisão/dimensão, recusa de reutilização de índice incompatível, rebuild/requeue explícito com confirmação destrutiva e golden evaluation do reranker determinístico com Recall@K, MRR e NDCG. Os contratos de ACL, temporalidade e mapping permanecem guards executáveis.
+O índice usa schema `evidence-v20.1`, fingerprint estável de espaço vetorial, recusa de índice incompatível, rebuild/requeue explícito e golden evals determinísticos. Providers externos não são inventados como homologados: sem provider, o runtime pode operar lexicalmente; provider/model/embedding configurado exige avaliação separada de qualidade, custo, fallback e red-team.
 
-A ausência de provider externo não é mascarada: o runtime real funciona lexicalmente quando embeddings não estão configurados. Providers de embeddings/chat continuam opcionais e explicitamente não homologados sem credenciais, custo e evidência de qualidade/fallback.
+## Módulos v20
 
-## Módulos v20 implementados depois da matriz antiga
+A.I TEC, Prefeitura/B2G, Admin SaaS, Condomínio, Imóvel 360/RE Rural, Solar e Municipality Factory possuem implementação operacional v20. O PR #68 adiciona ainda jornadas browser críticas e aprofundamentos de Solar/A.I TEC/quality gates. Isso não elimina a necessidade de dados reais, licenças, calibração e revisão profissional onde o Blueprint exige.
 
-A.I TEC já possui terrain/TIN, road engineering, basement parking, Building/Unit/Room Solver, environment, finance, optimization/Pareto e export stack. Prefeitura/B2G possui onboarding, dataset publication/rollback, CTM/CIB-SINTER/PGV/IPTU/ITBI/licenciamento, open-data guard, affected recalculation, materialized export e offboarding. Admin SaaS possui billing/ledger/dunning/refund/chargeback, fiscal orchestration, support sessions, CMS, analytics/cohorts, AI Ops e release/rollback. Condomínio, Imóvel 360/RE Rural e Solar também receberam incrementos operacionais v20. Municipality Factory foi mergeada pelo PR #66.
+## São Paulo e fontes live
 
-Essas implementações não eliminam os gates de dados reais, UX/browser, produção e revisão profissional.
+Existem tooling de inspeção, streaming sync, preflight, publicação/promoção e candidatos/gates de golden lots. Isso não constitui ingestão municipal homologada. Permanecem necessários acesso live, CRS/provenance/licença, QA, promoção canônica e 10–20 golden lots revisados profissionalmente.
 
-## São Paulo ao vivo
+## Gates externos ainda não homologados
 
-Existem tooling de inspeção, streaming sync, preflight, publicação/promoção e candidatos/gates de golden lots. Isso ainda não constitui ingestão municipal homologada. Permanecem necessários acesso live, CRS/provenance/licença, QA, promoção canônica e 10–20 golden lots revisados por profissional.
+Continuam pendentes:
 
-## Gates ainda não homologados
+- pentest independente e fechamento de achados Critical/High;
+- provider/model/embeddings reais com avaliação de qualidade/custo/fallback/red-team específico;
+- fontes oficiais/licenciadas live, contratos/licenças/provenance e dados/calibração reais;
+- revisões jurídica, engenharia, arquitetura, fiscal e institucional aplicáveis;
+- cloud/IaC escolhido, IAM/secrets/DNS/TLS/registry e staging production-like realmente implantado;
+- assinatura de imagens e build/provenance attestations no registry final;
+- canary/rollback real;
+- produção PITR/failover/HA/DR com RPO/RTO reais;
+- branch protection de `main` (#21), ainda observada como `protected=false` em 2026-08-26.
 
-Continuam pendentes providers externos de IA e sua qualidade/custo/fallback; fontes oficiais/licenciadas live; browser/mobile/a11y; observabilidade/SLO/alertas/runbooks; staging production-like e IaC; DNS/TLS/secrets/cloud IAM; pentest e red-team operacional; load/soak/capacity; canary/rollback em ambiente alvo; produção backup/restore e HA/DR com RPO/RTO medidos; LGPD operacional; revisão profissional aplicável; e branch protection de `main` (#21), observada como `protected=false` em 2026-08-26.
+## Próximo critério de aceitação
+
+O PR #68 só pode ser mergeado após execução real de CI/runtime/security e/ou Cortex no mesmo head, correção de toda falha encontrada e `localQualificationStatus=PASS`. Depois disso, os gates externos seguem como trilha separada até ser legítimo considerar `productionHomologated=true`.
 
 A matriz detalhada está em `docs/V20_ACCEPTANCE_MATRIX.md`.

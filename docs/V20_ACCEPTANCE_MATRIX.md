@@ -1,42 +1,46 @@
 # V20 Acceptance Matrix
 
-Baseline runtime validado: `42ac9a13ccb726f68e48a62be75e7d5bec1ffaa7` (`develop`, 2026-08-26; merge do PR #66).
+Baseline runtime consolidado em `develop`: `52ed13cc37109c02016b513113b13ab951c3bc9a` (PR #67), com CI #469 e runtime-e2e #62 PASS.
 
-A matriz impede que existência de código seja confundida com homologação. Cada frente é avaliada em quatro dimensões: **implementação**, **CI/regressão**, **runtime/integração** e **fonte externa/profissional/produção**.
+O PR #68 concentra a qualificação v20 pré-Cortex. O código/gates abaixo podem estar **implementados** sem ainda estarem **validados no head atual**, porque os GitHub-hosted jobs recentes têm terminado antes de executar steps (`steps=[]`, sem logs). Nenhum desses runs é contado como PASS.
+
+`productionHomologated=false` permanece obrigatório.
 
 | Frente | Implementação | CI/regressão | Runtime/integração | Externo/profissional | Estado atual |
 |---|---|---|---|---|---|
-| Runtime reproduzível | Implementado | PASS #456 | PASS #60 | produção separada | gate local concluído |
-| PostgreSQL/PostGIS + RLS | Implementado | PASS | PASS #60 | produção separada | gate local concluído |
-| OpenSearch evidence plane | Implementado; `indexed_at` só após `refresh=wait_for` | PASS | PASS #60, tenant/public/temporal | provider externo separado | gate local concluído |
-| AI index lifecycle + reranker | Implementado | PASS | PASS com stack local | provider/model quality pendente | implementação/runtime local concluídos |
-| Core Territorial/Legal | Engine temporal + golden corpus + instrumentos determinísticos implementados | PASS | coberto pelo stack/app; goldens sintéticos | fonte real + revisão profissional pendentes | aprofundamento real-source pendente |
-| São Paulo | inspection/sync/preflight/publication/golden gate implementados | PASS estático | tooling disponível; live não homologado | fonte oficial + 10–20 golden lots + revisão | prioridade de dados reais |
-| A.I TEC | terrain/TIN, road engineering, basement parking, Building/Unit/Room Solver, environment, finance, Pareto/optimization e exports implementados | PASS | advanced runtime API PASS #60 | dados de terreno/CAD-BIM/licenças/revisão profissional | engine avançado; homologação profissional pendente |
-| Solar | cenário v20 + string/MPPT e cálculos determinísticos implementados | PASS | smoke/runtime de serviço | imagery/DSM/DEM, tarifa/grid/equipamentos/calibração/revisão | engine implementado parcialmente contra dados externos |
-| Imóvel 360 / RE Rural | camada operacional v20 de mercado/readiness + base histórica | PASS | runtime de plataforma | fontes oficiais/licenciadas, modelos e casos profissionais | código-base avançado; dados reais pendentes |
-| Condomínio 360 | governança/lifecycle operacional v20 + base documental | PASS | runtime de plataforma | documentos reais, revisão jurídica e fluxos finais | código operacional; produto/E2E pendentes |
-| Prefeitura | onboarding, datasets, publicação/rollback, CTM/CIB-SINTER/PGV/IPTU/ITBI/licenciamento, open data, recálculo, export/offboarding implementados | PASS | DB/RLS/runtime cobertos | integrações e homologação institucional | código operacional concluído, instituição externa pendente |
-| Admin SaaS | billing/ledger/dunning/refund/chargeback, fiscal orchestration, support, CMS, analytics, AI Ops e release/rollback implementados | PASS | control-plane RLS/runtime cobertos | Mercado Pago/NFS-e/produção e operação real | código operacional avançado |
-| Municipality Factory | connector contracts, discovery seguro, snapshots, QA, candidates, goldens, publication, monitoramento e cobertura implementados | PASS | DB guards/RLS PASS #60 | fontes/licenças/goldens reais por município | implementação local concluída pelo #66 |
-| Browser/mobile/a11y | não fechado | — | — | revisão requerida | pendente #13 |
-| Segurança operacional | guards/RLS/red-team sintético e production gate existentes | regressões parciais | runtime isolamento PASS | pentest independente + exercícios operacionais | parcial #13 |
-| Load/soak/capacity | k6 health smoke existente | básico | não fecha capacidade por serviço | ambiente alvo requerido | pendente #13 |
-| Observabilidade/SLO | OTel/Prometheus/Grafana/Tempo/Loki e schemas operacionais existem | parcial | stack configurada | SLO/alert/runbook e evidência operacional | pendente #13 |
-| Backup/restore | scripts e dashboard operacional implementados | PASS | restore drill PASS #60 | produção/PITR/DR ainda requeridos | gate local concluído |
-| HA/DR produção | guardrails/scripts locais | parcial | restore local comprovado | RPO/RTO/HA/DR medidos no alvo | pendente #13 |
-| Staging/IaC/canary | compose production e release controls existem | parcial | não homologado | cloud/IAM/DNS/TLS/canary real | pendente #13 |
-| LGPD operacional | políticas/guards de dados existem em vários domínios | parcial | não há drill final consolidado | DPO/política/retenção real | pendente #13 |
-| Branch protection `main` | configuração administrativa | — | `protected=false` observado | ação administrativa GitHub | pendente #21 |
+| Runtime reproduzível | Compose full/ops + harness Cortex | static contracts no #68; runner real pendente | #62 PASS no baseline; novo harness pendente de execução integral | produção separada | capacidade pronta; revalidação do head necessária |
+| PostgreSQL/PostGIS + RLS | Implementado + cross-tenant runtime scripts | contratos presentes | baseline #62 PASS e suíte ampliada inclui `aitec.job` | produção separada | local consolidado; novo head a revalidar |
+| OpenSearch evidence plane | `refresh=wait_for`, ACL/public/temporal, provenance | regressões existentes | baseline PASS; fault recovery e load ampliados no #68 | segurança/cluster final dependem do ambiente | local avançado |
+| AI Core | hybrid retrieval/RRF/rerank, bitemporal, high-risk, red-team, RED/OTLP | regressões estáticas/unitárias | retrieval isolation/fault/load codificados | provider/model quality/cost real | código local avançado |
+| Core Territorial/Legal | evaluator temporal, instrumentos, analysis/evidence/report | regressões v20 | jornada UI análise→relatório adicionada | fonte real + revisão profissional | código/jornada principal avançados |
+| São Paulo | inspection/sync/preflight/publication/golden tooling | regressões | tooling local | GeoSampa live + goldens humanos | dados reais prioritários |
+| Imóvel 360 | ficha, mercado, CRM, diligence, AVM/comparables contracts, report | regressões + UI contract | UI resolve→analysis→report no #68 | comparáveis/licenças/calibração real | código avançado; dados reais pendentes |
+| RE Rural | registry/identity/geometry/overlap/monitor/export/readiness | regressões | plataforma local | CAR/SIGEF/SNCR/CCIR/CIB/CAFIR/IBAMA/INPE/FUNAI/CNUC/SICOR reais | fontes/goldens pendentes |
+| Condomínio 360 | docs/rules/governança/unidades/obras/assembleias/manutenção/compliance/AI | regressões + UI contract | UI private upload→index→chat no #68 | documentos/OCR/revisão jurídica/providers reais | produto local avançado |
+| Solar | posição solar, POA, packing, string/MPPT, battery/tariff/grid/finance | regressões numéricas | runtime/load codificados | imagery/DSM/DEM/tarifa/equipamentos/BDGD/calibração | engine local avançado |
+| A.I TEC | solver avançado + `aitec.job` + worker/retry/backoff/metrics | unit/contract/UI regressions | UI job→worker→resultado, RLS/fault/load codificados | CAD/BIM/datasets/licenças/revisão/goldens | engine/job/UX crítica avançados |
+| Prefeitura | onboarding/datasets/publication/fiscal/open-data/export | regressões | DB/RLS/runtime local | municípios/Receita/SINTER/CIB reais | integração institucional pendente |
+| Admin SaaS | billing/ledger/fiscal/support/CMS/analytics/AI Ops/release + BillingWorkspace | regressões + UI contract | UI subscription→invoice→payment→entitlement no #68 | Mercado Pago/NFS-e/operação real | código operacional avançado |
+| Municipality Factory | connectors/discovery/snapshots/QA/candidates/goldens/publication/monitor | regressões | guards/RLS baseline PASS | fontes/licenças/goldens reais | implementação local consolidada |
+| Browser/mobile/a11y | Playwright OIDC real, desktop/mobile, axe, 4 jornadas críticas UI | contract estático presente | execução real do novo head pendente | exploração manual final | implementado; validação final pendente |
+| Segurança operacional | RLS/auth/tenant leakage, AI red-team, baseline, fault injection, Trivy, ZAP opcional, SBOM | regressões presentes + security-scan workflow | local scripts/harness | pentest independente + provider red-team | automatizável avançado; pentest externo pendente |
+| Load/soak/capacity | k6 `ci/soak/capacity` multi-serviço | scripts/thresholds versionados | execução prolongada pendente | staging alvo necessário | implementado; medição final pendente |
+| Observabilidade/SLO | RED 5 serviços, OTLP, Prometheus/Grafana/Loki/Tempo/Alertmanager, worker queue metrics | config/rules contracts | runtime gate codificado | owner/on-call e exercício no alvo | implementado localmente; exercício final pendente |
+| Backup/restore/DR local | DB + object storage + checksums + schema asserts + RPO/RTO sintéticos | DR contract test | harness codificado | PITR/failover/HA/DR real | capacidade local avançada; produção pendente |
+| Staging/release/canary | production parity, structural staging parity, `image@sha256`, rollback self-test, AI-eval canary | contracts no CI | execução real pendente | cloud/IAM/secrets/DNS/TLS/registry/canary real | modelo de promoção implementado |
+| Supply-chain | imagens MinIO versionadas, inventory + CycloneDX SBOM, floating-tag guards, Trivy 0.73.0 | contracts + security-scan workflow | Cortex escaneia filesystem e imagens locais | signatures/attestations, registry e política final CVE | inventário + scan local implementados |
+| LGPD operacional | requests, retention, legal hold, erasure/export, append-only | regressões | drill DB/API no harness | DPO/políticas e sistemas externos/IdP | implementação local avançada |
+| Branch protection `main` | configuração administrativa | — | `protected=false` observado | ação GitHub admin | pendente #21 |
 
-## Evidência runtime consolidada
+## Evidência consolidada que já existe
 
-- PR #34 → merge `71287ffde8590c89fcfb570c040a7f215892ac69`; `ci` 32839748000 PASS; `runtime-e2e` 32839747999 PASS.
-- PR #43 → merge `8802b27878d0a745dcc9290a4de2ae564265964b`; `ci` 32840808815 PASS; `runtime-e2e` 32840808863 PASS.
-- PR #66 → merge `42ac9a13ccb726f68e48a62be75e7d5bec1ffaa7`; `ci` run #456 PASS; `runtime-e2e` run #60 PASS; artifact `9602867789`.
+- PR #34 → merge `71287ffde8590c89fcfb570c040a7f215892ac69`; CI/runtime PASS.
+- PR #43 → merge `8802b27878d0a745dcc9290a4de2ae564265964b`; CI/runtime PASS.
+- PR #66 → merge `42ac9a13ccb726f68e48a62be75e7d5bec1ffaa7`; CI #456 PASS; runtime-e2e #60 PASS; artifact `9602867789`.
+- PR #67 → merge `52ed13cc37109c02016b513113b13ab951c3bc9a`; CI #469 PASS; runtime-e2e #62 PASS; baseline atual de `develop`.
 
-O runtime #60 prova stack local/reproduzível, migrations, smoke, A.I TEC advanced API, RLS, Municipality Factory guards, OpenSearch ingest/retrieval tenant/public/temporal isolation e backup/restore. Ele **não** prova produção, fonte municipal oficial, provider externo de IA, revisão jurídica/engenharia/arquitetura/fiscal ou DR de produção.
+O runtime baseline prova stack/migrations/smoke, A.I TEC advanced API, RLS, Municipality Factory e OpenSearch tenant/public/temporal isolation. O PR #68 amplia esse escopo, porém ainda precisa de uma execução com **steps reais** antes de ser considerado validado ou mergeado.
 
 ## Regra de conclusão
 
-Uma frente só pode ser marcada como homologada quando seus gates aplicáveis estiverem acompanhados de evidência reproduzível. `productionHomologated = true` exige, no mínimo, fechamento dos gates de produção do issue #13 e das fontes/revisões profissionais aplicáveis.
+Uma frente só é homologada quando seus gates aplicáveis têm evidência reproduzível. `productionHomologated=true` exige, além do fechamento local, pentest, dados/providers/revisões aplicáveis, staging real, assinatura/provenance de release, canary/rollback real e HA/PITR/DR com RPO/RTO no ambiente final.

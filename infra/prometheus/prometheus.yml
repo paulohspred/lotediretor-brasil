@@ -13,9 +13,31 @@ scrape_configs:
   - job_name: control-api
     metrics_path: /metrics
     static_configs: [{targets: ['control-api:3002']}]
+  - job_name: ai-gateway
+    metrics_path: /metrics
+    static_configs: [{targets: ['ai-gateway:3003']}]
   - job_name: solar-engine
     metrics_path: /metrics
     static_configs: [{targets: ['solar-engine:8001']}]
   - job_name: aitec-engine
     metrics_path: /metrics
     static_configs: [{targets: ['aitec-engine:8002']}]
+  - job_name: aitec-worker
+    metrics_path: /metrics
+    static_configs: [{targets: ['aitec-worker:9104']}]
+  - job_name: blackbox-http
+    metrics_path: /probe
+    params:
+      module: [http_2xx]
+    static_configs:
+      - targets:
+          - http://ai-gateway:3003/ai/health
+          - http://gateway:8080/api/v1/health
+          - http://keycloak:8080/realms/lotediretor/.well-known/openid-configuration
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox-exporter:9115

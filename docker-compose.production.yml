@@ -24,10 +24,13 @@ services:
       PLATFORM_DB_WORKER_PASSWORD: ${PLATFORM_DB_WORKER_PASSWORD:?required}
       CONTROL_DB_WORKER_PASSWORD: ${CONTROL_DB_WORKER_PASSWORD:?required}
   minio:
+    image: ${MINIO_IMAGE:-minio/minio:RELEASE.2025-07-23T15-54-02Z}
     environment:
       MINIO_ROOT_USER: ${S3_ACCESS_KEY:?required}
       MINIO_ROOT_PASSWORD: ${S3_SECRET_KEY:?required}
-    ports: []
+    ports: !reset []
+  minio-init:
+    image: ${MINIO_MC_IMAGE:-minio/mc:RELEASE.2025-08-13T08-35-41Z}
   keycloak:
     command:
     - start
@@ -41,7 +44,7 @@ services:
       KC_METRICS_ENABLED: 'true'
       KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN:?required}
       KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?required}
-    ports: []
+    ports: !reset []
     volumes:
     - ./infra/keycloak/generated/realm-lotediretor.production.json:/opt/keycloak/data/import/realm-lotediretor.json:ro
     - ./infra/keycloak/themes/lotediretor:/opt/keycloak/themes/lotediretor:ro
@@ -49,7 +52,7 @@ services:
     environment:
       NODE_ENV: production
       PLATFORM_DATABASE_URL: postgresql://${PLATFORM_DB_APP_USER:-lotediretor_app}:${PLATFORM_DB_APP_PASSWORD:?required}@platform-db:5432/${PLATFORM_DB_NAME:?required}
-      PLATFORM_MIGRATION_DATABASE_URL: postgresql://${PLATFORM_DB_MIGRATION_USER:?required}:${PLATFORM_DB_MIGRATION_PASSWORD:?required}@platform-db:5432/${PLATFORM_DB_NAME:?required}
+      PLATFORM_MIGRATION_DATABASE_URL: ''
       SESSION_COOKIE_SECURE: 'true'
       ALLOW_LOCAL_AUTO_MEMBERSHIP: 'false'
       INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN:?required}
@@ -58,19 +61,22 @@ services:
       OIDC_REDIRECT_URI: https://${PUBLIC_DOMAIN:?required}/api/v1/auth/callback
       S3_ACCESS_KEY: ${S3_ACCESS_KEY:?required}
       S3_SECRET_KEY: ${S3_SECRET_KEY:?required}
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-http://otel-collector:4318}
       RUN_MIGRATIONS_ON_START: 'false'
   control-api:
     environment:
       NODE_ENV: production
       CONTROL_DATABASE_URL: postgresql://${CONTROL_DB_APP_USER:-lotediretor_control_app}:${CONTROL_DB_APP_PASSWORD:?required}@control-db:5432/${CONTROL_DB_NAME:?required}
-      CONTROL_MIGRATION_DATABASE_URL: postgresql://${CONTROL_DB_MIGRATION_USER:?required}:${CONTROL_DB_MIGRATION_PASSWORD:?required}@control-db:5432/${CONTROL_DB_NAME:?required}
+      CONTROL_MIGRATION_DATABASE_URL: ''
       INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN:?required}
       MERCADOPAGO_WEBHOOK_SECRET: ${MERCADOPAGO_WEBHOOK_SECRET:-}
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-http://otel-collector:4318}
       RUN_MIGRATIONS_ON_START: 'false'
   ai-gateway:
     environment:
       NODE_ENV: production
       INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN:?required}
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-http://otel-collector:4318}
       AI_FALLBACK_BASE_URL: ${AI_FALLBACK_BASE_URL:-}
       AI_FALLBACK_CHAT_ENDPOINT: ${AI_FALLBACK_CHAT_ENDPOINT:-}
       AI_FALLBACK_API_KEY: ${AI_FALLBACK_API_KEY:-}
@@ -86,12 +92,42 @@ services:
     environment:
       APP_ENV: production
       INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN:?required}
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-http://otel-collector:4318}
   aitec-engine:
     environment:
       APP_ENV: production
       INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN:?required}
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-http://otel-collector:4318}
+  aitec-worker:
+    build:
+      context: .
+      dockerfile: workers/aitec/Dockerfile
+    environment:
+      PLATFORM_DATABASE_URL: postgresql://lotediretor_worker:${PLATFORM_DB_WORKER_PASSWORD:?required}@platform-db:5432/${PLATFORM_DB_NAME:?required}
+      AITEC_ENGINE_INTERNAL_URL: ${AITEC_ENGINE_INTERNAL_URL:-http://aitec-engine:8002}
+      INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN:?required}
+      AITEC_METRICS_PORT: ${AITEC_METRICS_PORT:-9104}
+      AITEC_JOB_RETRY_BASE_SECONDS: ${AITEC_JOB_RETRY_BASE_SECONDS:-5}
+      AITEC_JOB_RETRY_MAX_SECONDS: ${AITEC_JOB_RETRY_MAX_SECONDS:-60}
+    depends_on:
+      platform-db:
+        condition: service_healthy
+      platform-db-role-init:
+        condition: service_completed_successfully
+      aitec-engine:
+        condition: service_healthy
+    healthcheck:
+      test:
+      - CMD
+      - python
+      - -c
+      - import urllib.request; urllib.request.urlopen('http://127.0.0.1:9104/metrics',timeout=3)
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
   gateway:
-    ports:
+    ports: !override
     - 80:80
     - 443:443
     environment:
@@ -102,10 +138,12 @@ services:
     - ./infra/caddy/Caddyfile.production:/etc/caddy/Caddyfile:ro
     - caddy_data:/data
     - caddy_config:/config
+  opensearch:
+    ports: !reset []
   prometheus:
-    ports: []
+    ports: !reset []
   grafana:
-    ports: []
+    ports: !reset []
   event-dispatcher:
     environment:
       PLATFORM_EVENT_DATABASE_URL: postgresql://lotediretor_event_dispatcher:${PLATFORM_DB_EVENT_PASSWORD:?required}@platform-db:5432/${PLATFORM_DB_NAME:?required}

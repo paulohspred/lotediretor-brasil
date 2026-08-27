@@ -84,7 +84,7 @@ assert report['status']=='REPORT_READY' and report['classification']=='PRELIMINA
 assert report['sources'][0]['source_snapshot_id']==meta['source_snapshot_id']
 assert report['external_gates']
 
-required={'source.validate','dsm.roof-surfaces','dsm.obstacles','shadow.project','energy.irradiance','battery.simulate','tariff.apply','connection.precheck','ground-mount.layout','safety.conditioning','calibration.compare','bill.parse-ocr','equipment.snapshot','scene.build','report.build'}
+required={'source.validate','dsm.roof-surfaces','dsm.obstacles','solar.position','irradiance.poa','shadow.project','roof.layout','electrical.string-mppt','energy.irradiance','battery.simulate','tariff.apply','financial.project','connection.precheck','ground-mount.layout','safety.conditioning','calibration.compare','bill.parse-ocr','equipment.snapshot','scene.build','report.build'}
 assert required==set(REGISTRY)
 assert len(capabilities())==len(required)
 api_energy=execute_operation('energy.irradiance',kwargs={'dc_kwp':5,'monthly_poa_kwh_m2':[100]*12,'loss_fractions':losses})

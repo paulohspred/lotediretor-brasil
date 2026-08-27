@@ -1,0 +1,25 @@
+# Repository-level fallback
+* @paulohspred
+
+# Runtime/API ownership
+/services/platform-api/ @paulohspred
+/services/control-api/ @paulohspred
+/services/ai-gateway/ @paulohspred
+/services/aitec-engine/ @paulohspred
+/services/solar-engine/ @paulohspred
+/workers/ @paulohspred
+
+# Frontends and identity edge
+/apps/ @paulohspred
+/infra/caddy/ @paulohspred
+/infra/keycloak/ @paulohspred
+
+# Data, reliability and release controls
+/db/ @paulohspred
+/infra/prometheus/ @paulohspred
+/infra/grafana/ @paulohspred
+/infra/otel/ @paulohspred
+/infra/loki/ @paulohspred
+/infra/tempo/ @paulohspred
+/ops/ @paulohspred
+/.github/workflows/ @paulohspred

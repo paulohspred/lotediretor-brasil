@@ -1,0 +1,23 @@
+{
+  "schemaVersion": "lotediretor-production-homologation-v1",
+  "environment": "production",
+  "productionHomologated": false,
+  "candidateCommit": "REPLACE_WITH_40_CHAR_RELEASE_COMMIT",
+  "releaseImages": [],
+  "gates": {
+    "independent_pentest": {"status":"PENDING","evidenceRef":"","owner":"","completedAtUtc":"","classification":""},
+    "provider_specific_ai_redteam": {"status":"PENDING","evidenceRef":"","owner":"","completedAtUtc":"","classification":""},
+    "production_like_staging": {"status":"PENDING","evidenceRef":"","owner":"","completedAtUtc":"","classification":""},
+    "release_image_signature_provenance": {"status":"PENDING","evidenceRef":"","owner":"","completedAtUtc":"","classification":""},
+    "live_canary_rollback": {"status":"PENDING","evidenceRef":"","owner":"","completedAtUtc":"","classification":""},
+    "production_ha_dr": {"status":"PENDING","evidenceRef":"","owner":"","completedAtUtc":"","classification":""},
+    "official_sources_and_providers": {"status":"PENDING","evidenceRef":"","owner":"","completedAtUtc":"","classification":""},
+    "professional_institutional_review": {"status":"PENDING","evidenceRef":"","owner":"","completedAtUtc":"","classification":""},
+    "main_branch_protection": {"status":"PENDING","evidenceRef":"","owner":"","completedAtUtc":"","classification":""}
+  },
+  "approval": {
+    "approvedBy": "",
+    "approvedAtUtc": "",
+    "changeTicket": ""
+  }
+}

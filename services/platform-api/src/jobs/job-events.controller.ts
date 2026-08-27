@@ -18,6 +18,8 @@ export class JobEventsController{
       if(report.rowCount)return report.rows[0];
       const ingest=await c.query(`select id,'DOCUMENT_INGEST' kind,status,null::text "artifactKey",coalesce(completed_at,started_at,created_at)::text "updatedAt" from ingest.document_job where id=$1 and tenant_id=$2`,[id,tenantId]);
       if(ingest.rowCount)return ingest.rows[0];
+      const aitec=await c.query(`select id,'AITEC' kind,status,null::text "artifactKey",coalesce(completed_at,started_at,created_at)::text "updatedAt" from aitec.job where id=$1 and tenant_id=$2`,[id,tenantId]);
+      if(aitec.rowCount)return aitec.rows[0];
       return null;
     });
   }

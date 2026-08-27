@@ -17,11 +17,11 @@ permissions:
 jobs:
   docker-runtime:
     runs-on: ubuntu-latest
-    timeout-minutes: 50
+    timeout-minutes: 75
     env:
       COMPOSE_PROJECT_NAME: lotediretor_ci
-      COMPOSE_FILE: docker-compose.yml:docker-compose.ci.yml
-      COMPOSE_PROFILES: full
+      COMPOSE_FILE: docker-compose.yml:docker-compose.ci.yml:docker-compose.ops.yml
+      COMPOSE_PROFILES: full,ops
       COMPOSE_PARALLEL_LIMIT: 2
       HTTP_PORT: 8080
       PLATFORM_DB_MIGRATION_USER: lotediretor
@@ -46,11 +46,16 @@ jobs:
       KEYCLOAK_ADMIN: ci-admin
       KEYCLOAK_ADMIN_PASSWORD: ci-keycloak-admin-2026
       OIDC_CLIENT_ID: lotediretor-app
-      OIDC_CLIENT_SECRET: ci-oidc-client-secret-2026
+      OIDC_CLIENT_SECRET: local-lotediretor-secret
       SESSION_COOKIE_SECURE: 'false'
       ALLOW_LOCAL_AUTO_MEMBERSHIP: 'true'
+      GRAFANA_ADMIN_USER: ci-admin
+      GRAFANA_ADMIN_PASSWORD: ci-grafana-admin-2026
       BACKUP_DIR: ./backups-ci
       BACKUP_RETENTION_DAYS: 0
+      SECURITY_ARTIFACT_DIR: ./runtime-artifacts/security
+      RESILIENCE_ARTIFACT_DIR: ./runtime-artifacts/resilience
+      DR_ARTIFACT_DIR: ./runtime-artifacts/dr
 
     steps:
       - uses: actions/checkout@v4
@@ -81,7 +86,7 @@ jobs:
         run: docker compose up -d
 
       - name: Wait for healthy runtime
-        run: ./ops/runtime/wait-healthy.sh 420
+        run: ./ops/runtime/wait-healthy.sh 480
 
       - name: Verify schema migrations completed
         run: |
@@ -98,11 +103,39 @@ jobs:
       - name: Prove non-owner cross-tenant RLS isolation
         run: ./ops/rls/runtime-isolation.sh
 
+      - name: Prove privacy LGPD RLS legal-hold and retention guards
+        run: ./ops/privacy/runtime-integration.sh
+
       - name: Prove Municipality Factory DB guards and tenant isolation
         run: ./ops/municipality/factory-runtime.sh
 
       - name: Prove OpenSearch ingest and retrieval isolation
         run: ./ops/ai/runtime-integration.sh
+
+      - name: Prove runtime AI prompt-injection tenant and tool boundaries
+        run: bash ./ops/security/ai-redteam-runtime.sh
+
+      - name: Seed explicitly synthetic browser critical-journey fixtures
+        run: bash ./ops/browser/seed-critical-journeys.sh
+
+      - name: Prove browser OIDC mobile accessibility and critical business journeys
+        run: bash ./ops/browser/run-e2e.sh
+
+      - name: Prove runtime security boundaries and supply chain
+        run: |
+          bash ./ops/security/runtime-baseline.sh
+          python3 ./ops/security/supply-chain.py
+
+      - name: Run short multi-service load regression gate
+        env:
+          LOAD_PROFILE: ci
+        run: bash ./ops/load/run.sh
+
+      - name: Prove controlled service failure and recovery
+        run: bash ./ops/resilience/runtime-fault-injection.sh
+
+      - name: Prove observability targets probes and rules after recovery
+        run: bash ./ops/observability/runtime-gate.sh
 
       - name: Run backup and restore drill
         run: |

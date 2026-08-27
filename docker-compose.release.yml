@@ -1,0 +1,64 @@
+# Promotion overlay: production consumes immutable registry artifacts only.
+# The CI/build pipeline publishes these images first; staging/prod then promote
+# the exact same @sha256 digests. No source build is allowed in this model.
+services:
+  platform-api:
+    build: !reset null
+    image: ${PLATFORM_API_IMAGE:?immutable @sha256 image required}
+  platform-migrate:
+    build: !reset null
+    image: ${PLATFORM_API_IMAGE:?immutable @sha256 image required}
+  control-api:
+    build: !reset null
+    image: ${CONTROL_API_IMAGE:?immutable @sha256 image required}
+  control-migrate:
+    build: !reset null
+    image: ${CONTROL_API_IMAGE:?immutable @sha256 image required}
+  ai-gateway:
+    build: !reset null
+    image: ${AI_GATEWAY_IMAGE:?immutable @sha256 image required}
+  solar-engine:
+    build: !reset null
+    image: ${SOLAR_ENGINE_IMAGE:?immutable @sha256 image required}
+  aitec-engine:
+    build: !reset null
+    image: ${AITEC_ENGINE_IMAGE:?immutable @sha256 image required}
+  aitec-worker:
+    build: !reset null
+    image: ${AITEC_WORKER_IMAGE:?immutable @sha256 image required}
+  event-dispatcher:
+    build: !reset null
+    image: ${EVENT_DISPATCHER_IMAGE:?immutable @sha256 image required}
+  geo-worker:
+    build: !reset null
+    image: ${GEO_WORKER_IMAGE:?immutable @sha256 image required}
+  document-worker:
+    build: !reset null
+    image: ${DOCUMENT_WORKER_IMAGE:?immutable @sha256 image required}
+  report-worker:
+    build: !reset null
+    image: ${REPORT_WORKER_IMAGE:?immutable @sha256 image required}
+  rural-monitor-worker:
+    build: !reset null
+    image: ${RURAL_MONITOR_WORKER_IMAGE:?immutable @sha256 image required}
+  rural-export-worker:
+    build: !reset null
+    image: ${RURAL_EXPORT_WORKER_IMAGE:?immutable @sha256 image required}
+  billing-worker:
+    build: !reset null
+    image: ${BILLING_WORKER_IMAGE:?immutable @sha256 image required}
+  data-pipelines:
+    build: !reset null
+    image: ${DATA_PIPELINES_IMAGE:?immutable @sha256 image required}
+  ai-ingest:
+    build: !reset null
+    image: ${AI_INGEST_IMAGE:?immutable @sha256 image required}
+  site-web:
+    build: !reset null
+    image: ${SITE_WEB_IMAGE:?immutable @sha256 image required}
+  client-web:
+    build: !reset null
+    image: ${CLIENT_WEB_IMAGE:?immutable @sha256 image required}
+  admin-web:
+    build: !reset null
+    image: ${ADMIN_WEB_IMAGE:?immutable @sha256 image required}

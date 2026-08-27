@@ -1,0 +1,27 @@
+name: security-scan
+on: [push, pull_request]
+
+jobs:
+  trivy-filesystem:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Pull pinned Trivy scanner
+        run: docker pull aquasec/trivy:0.73.0
+      - name: Scan repository for HIGH/CRITICAL vulnerabilities, misconfiguration and secrets
+        env:
+          SECURITY_ARTIFACT_DIR: ${{ runner.temp }}/lotediretor-security
+          TRIVY_IMAGE: aquasec/trivy:0.73.0
+        run: |
+          mkdir -p "$SECURITY_ARTIFACT_DIR"
+          bash ops/security/trivy-scan.sh
+      - name: Upload Trivy evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: trivy-security-scan
+          path: ${{ runner.temp }}/lotediretor-security
+          if-no-files-found: warn
+          retention-days: 14

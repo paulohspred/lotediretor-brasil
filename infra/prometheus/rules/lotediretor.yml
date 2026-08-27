@@ -1,13 +1,113 @@
 groups:
   - name: lotediretor-runtime
     rules:
+      - record: lotediretor:http_requests:rate5m
+        expr: sum by (service) (rate(lotediretor_http_requests_total[5m]))
+      - record: lotediretor:http_5xx:ratio5m
+        expr: sum by (service) (rate(lotediretor_http_requests_total{status_class="5xx"}[5m])) / clamp_min(sum by (service) (rate(lotediretor_http_requests_total[5m])), 0.001)
+      - record: lotediretor:http_latency:p95_5m
+        expr: histogram_quantile(0.95, sum by (service, le) (rate(lotediretor_http_request_duration_seconds_bucket[5m])))
+
       - alert: LoteDiretorServiceDown
         expr: lotediretor_service_up == 0
         for: 2m
         labels: {severity: critical}
-        annotations: {summary: "LoteDiretor service/database unavailable"}
+        annotations:
+          summary: "LoteDiretor service/database unavailable"
+          runbook: "docs/ops/RUNBOOKS.md#service-or-database-down"
+
       - alert: LoteDiretorTargetMissing
         expr: up == 0
         for: 2m
         labels: {severity: critical}
-        annotations: {summary: "Prometheus target unavailable"}
+        annotations:
+          summary: "Prometheus target unavailable"
+          runbook: "docs/ops/RUNBOOKS.md#prometheus-target-missing"
+
+      - alert: LoteDiretorEdgeProbeDown
+        expr: probe_success{job="blackbox-http"} == 0
+        for: 2m
+        labels: {severity: critical}
+        annotations:
+          summary: "External HTTP probe failed for {{ $labels.instance }}"
+          runbook: "docs/ops/RUNBOOKS.md#service-or-database-down"
+
+      - alert: LoteDiretorHigh5xxRate
+        expr: lotediretor:http_5xx:ratio5m > 0.01
+        for: 5m
+        labels: {severity: warning}
+        annotations:
+          summary: "HTTP 5xx ratio above 1% for {{ $labels.service }}"
+          runbook: "docs/ops/RUNBOOKS.md#high-http-5xx-rate"
+
+      - alert: LoteDiretorCritical5xxRate
+        expr: lotediretor:http_5xx:ratio5m > 0.05
+        for: 2m
+        labels: {severity: critical}
+        annotations:
+          summary: "HTTP 5xx ratio above 5% for {{ $labels.service }}"
+          runbook: "docs/ops/RUNBOOKS.md#high-http-5xx-rate"
+
+      - alert: LoteDiretorHighP95Latency
+        expr: lotediretor:http_latency:p95_5m > 1.5
+        for: 10m
+        labels: {severity: warning}
+        annotations:
+          summary: "HTTP p95 latency above 1.5s for {{ $labels.service }}"
+          runbook: "docs/ops/RUNBOOKS.md#high-p95-latency"
+
+      - alert: LoteDiretorAitecWorkerDown
+        expr: up{job="aitec-worker"} == 0
+        for: 2m
+        labels: {severity: critical}
+        annotations:
+          summary: "A.I TEC durable job worker is not scrapeable"
+          runbook: "docs/ops/RUNBOOKS.md#a-i-tec-job-queue-or-worker-failure"
+
+      - alert: LoteDiretorAitecWorkerDbStale
+        expr: time() - lotediretor_aitec_worker_last_db_success_unixtime > 60
+        for: 2m
+        labels: {severity: critical}
+        annotations:
+          summary: "A.I TEC worker has not completed a database cycle for more than 60s"
+          runbook: "docs/ops/RUNBOOKS.md#a-i-tec-job-queue-or-worker-failure"
+
+      - alert: LoteDiretorAitecQueueBacklog
+        expr: lotediretor_aitec_jobs{status="QUEUED"} > 20
+        for: 10m
+        labels: {severity: warning}
+        annotations:
+          summary: "A.I TEC queue depth above 20 jobs for 10m"
+          runbook: "docs/ops/RUNBOOKS.md#a-i-tec-job-queue-or-worker-failure"
+
+      - alert: LoteDiretorAitecQueueStalled
+        expr: lotediretor_aitec_oldest_job_age_seconds{status="QUEUED"} > 120
+        for: 5m
+        labels: {severity: warning}
+        annotations:
+          summary: "Oldest queued A.I TEC job is older than 120s"
+          runbook: "docs/ops/RUNBOOKS.md#a-i-tec-job-queue-or-worker-failure"
+
+      - alert: LoteDiretorAitecQueueCriticallyStalled
+        expr: lotediretor_aitec_oldest_job_age_seconds{status="QUEUED"} > 600
+        for: 2m
+        labels: {severity: critical}
+        annotations:
+          summary: "Oldest queued A.I TEC job is older than 10 minutes"
+          runbook: "docs/ops/RUNBOOKS.md#a-i-tec-job-queue-or-worker-failure"
+
+      - alert: LoteDiretorAitecJobFailures
+        expr: increase(lotediretor_aitec_job_executions_total{result="failed"}[15m]) > 0
+        for: 1m
+        labels: {severity: warning}
+        annotations:
+          summary: "One or more A.I TEC jobs failed in the last 15m"
+          runbook: "docs/ops/RUNBOOKS.md#a-i-tec-job-queue-or-worker-failure"
+
+      - alert: LoteDiretorAitecRetryStorm
+        expr: increase(lotediretor_aitec_job_executions_total{result="retry"}[10m]) > 10
+        for: 2m
+        labels: {severity: warning}
+        annotations:
+          summary: "A.I TEC worker retried more than 10 executions in 10m"
+          runbook: "docs/ops/RUNBOOKS.md#a-i-tec-job-queue-or-worker-failure"

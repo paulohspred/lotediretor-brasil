@@ -36,7 +36,7 @@ ENGINE_DURATION = Histogram(
 )
 WORKER_LOOP_ERRORS = Counter('lotediretor_aitec_worker_loop_errors_total', 'Unhandled A.I TEC worker loop errors.')
 LAST_DB_SUCCESS = Gauge('lotediretor_aitec_worker_last_db_success_unixtime', 'Unix timestamp of the last successful A.I TEC worker database cycle.')
-WORKER_READY = Gauge('lotediretor_aitec_worker_ready', '1 after the A.I TEC worker metrics server has started.')
+WORKER_READY = Gauge('lotediretor_aitec_worker_ready', '1 only after a successful A.I TEC worker database cycle.')
 _last_metrics_refresh = 0.0
 
 
@@ -233,10 +233,11 @@ def fail(conn: psycopg.Connection, job: dict, error: EngineFailure) -> bool:
 def process_one() -> bool:
     with psycopg.connect(DB) as conn:
         reclaim_stale(conn)
-        refresh_queue_metrics(conn)
+        refresh_queue_metrics(conn, force=True)
+        LAST_DB_SUCCESS.set(time.time())
+        WORKER_READY.set(1)
         job = claim(conn)
         if not job:
-            LAST_DB_SUCCESS.set(time.time())
             return False
         try:
             with ENGINE_DURATION.time():
@@ -259,7 +260,7 @@ def process_one() -> bool:
 
 def main() -> None:
     start_http_server(METRICS_PORT, addr='0.0.0.0')
-    WORKER_READY.set(1)
+    WORKER_READY.set(0)
     print(
         f'aitec-worker engine={ENGINE} max_attempts={MAX_ATTEMPTS} stale_seconds={STALE_SECONDS} '
         f'retry_base_seconds={RETRY_BASE_SECONDS} retry_max_seconds={RETRY_MAX_SECONDS} metrics_port={METRICS_PORT}',
@@ -270,6 +271,7 @@ def main() -> None:
             if not process_one():
                 time.sleep(POLL_SECONDS)
         except Exception as exc:
+            WORKER_READY.set(0)
             WORKER_LOOP_ERRORS.inc()
             print(f'aitec worker loop error {exc!r}', flush=True)
             time.sleep(max(2.0, POLL_SECONDS))

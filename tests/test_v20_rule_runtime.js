@@ -45,6 +45,36 @@ r=runtime.evaluateRuleGraph(rules,deps,{zone_code:'ZEU',operation_code:'OUC',lot
 assert(!r.selected.some(x=>x.id==='license'));
 assert(r.blocked.some(x=>x.rule.id==='license'&&x.reason==='required_rule_not_applicable'));
 
+// Transitive REQUIRES must be independent of dependency row order.
+const chainRules=[
+  {id:'a',status:'CONFIRMED',rule_code:'A',condition:{}},
+  {id:'b',status:'CONFIRMED',rule_code:'B',condition:{}},
+  {id:'c',status:'CONFIRMED',rule_code:'C',condition:{field:'missing_fact',op:'eq',value:true}},
+];
+const chainForward=[
+  {rule_id:'a',depends_on_rule_id:'b',dependency_type:'REQUIRES',status:'CONFIRMED'},
+  {rule_id:'b',depends_on_rule_id:'c',dependency_type:'REQUIRES',status:'CONFIRMED'},
+];
+const chainReverse=[...chainForward].reverse();
+for(const order of [chainForward,chainReverse]){
+  r=runtime.evaluateRuleGraph(chainRules,order,{},'2026-01-01');
+  assert(!r.selected.some(x=>x.id==='a'),'A must be removed when transitive prerequisite C is unavailable');
+  assert(!r.selected.some(x=>x.id==='b'),'B must be removed when C is unavailable');
+  assert(r.blocked.some(x=>x.rule.id==='a'&&x.dependencyRuleId==='b'));
+  assert(r.blocked.some(x=>x.rule.id==='b'&&x.dependencyRuleId==='c'));
+}
+
+// Confirmed dependency cycles fail closed instead of being treated as mutual proof.
+const cyclicRules=[
+  {id:'cycle-a',status:'CONFIRMED',rule_code:'CYCLE_A',condition:{}},
+  {id:'cycle-b',status:'CONFIRMED',rule_code:'CYCLE_B',condition:{}},
+];
+r=runtime.evaluateRuleGraph(cyclicRules,[
+  {rule_id:'cycle-a',depends_on_rule_id:'cycle-b',dependency_type:'REQUIRES',status:'CONFIRMED'},
+  {rule_id:'cycle-b',depends_on_rule_id:'cycle-a',dependency_type:'REQUIRES',status:'CONFIRMED'},
+],{},'2026-01-01');
+assert(r.conflicts.some(x=>x.kind==='DEPENDENCY_CYCLE'&&x.ruleIds.includes('cycle-a')&&x.ruleIds.includes('cycle-b')));
+
 // Same-precedence contradictory confirmed rules are surfaced as conflict, never arbitrarily chosen.
 const conflict=[
   {id:'h1',status:'CONFIRMED',rule_code:'HEIGHT_MAX',priority:50,condition:{},value_numeric:28,unit:'m'},

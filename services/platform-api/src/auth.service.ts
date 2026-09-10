@@ -19,7 +19,9 @@ export class AuthService{
     const userId=uuidValidate(String(user.sub||''))?String(user.sub):uuidv5(String(user.sub||user.email),SUBJECT_NAMESPACE);
     await this.pool.query(`insert into iam.user_profile(id,email,display_name) values($1,$2,$3) on conflict(id) do update set email=excluded.email,display_name=excluded.display_name,privacy_status='ACTIVE',anonymized_at=null`,[userId,String(user.email||`${userId}@oidc.local`),user.name||user.preferred_username||null]);
     let memberships=(await this.pool.query(`select m.organization_id,m.role,o.status from iam.membership m join iam.organization o on o.id=m.organization_id where m.user_id=$1 and o.status='ACTIVE' order by m.created_at`,[userId])).rows;
-    const allowLocal=process.env.ALLOW_LOCAL_AUTO_MEMBERSHIP==='true'||process.env.NODE_ENV!=='production';
+    // Auto-membership is opt-in. Environment type alone must never grant access: this
+    // keeps staging/preview deployments fail-closed when NODE_ENV is misconfigured.
+    const allowLocal=process.env.ALLOW_LOCAL_AUTO_MEMBERSHIP==='true';
     if(!memberships.length&&allowLocal){await this.pool.query(`insert into iam.membership(organization_id,user_id,role) values($1,$2,$3) on conflict(organization_id,user_id) do update set role=excluded.role`,[LOCAL_ORG,userId,keycloakRoles.includes('admin')?'admin':'user']);memberships=[{organization_id:LOCAL_ORG,role:keycloakRoles.includes('admin')?'admin':'user',status:'ACTIVE'}];}
     if(!memberships.length)throw new Error('OIDC user has no active organization membership');
     const organizationId=String(memberships[0].organization_id);const membershipRole=String(memberships[0].role);const ent=(await this.pool.query(`select snapshot from core.entitlement_snapshot where organization_id=$1 and valid_from<=now() and (valid_to is null or valid_to>now()) order by valid_from desc limit 1`,[organizationId])).rows[0]?.snapshot||{tier:'unassigned',modules:[],quotas:{}};

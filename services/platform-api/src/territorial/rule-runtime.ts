@@ -38,7 +38,7 @@ export type RuleRuntimeResult={
   calculated:Array<{ruleId:string;ruleCode:string|null;result:FormulaResult}>;
   unknown:Array<{rule:RuntimeRule;evaluation:ConditionEvaluation;reason?:string}>;
   blocked:Array<{rule:RuntimeRule;reason:string;dependencyRuleId?:string}>;
-  conflicts:Array<{kind:'EXCLUDES'|'SAME_PRECEDENCE';ruleIds:string[];group?:string;reason:string}>;
+  conflicts:Array<{kind:'EXCLUDES'|'SAME_PRECEDENCE'|'DEPENDENCY_CYCLE';ruleIds:string[];group?:string;reason:string}>;
   trace:Array<{ruleId:string;state:string;detail?:string}>;
 };
 
@@ -111,6 +111,33 @@ export function evaluateFormula(formula:any,ctx:RuleContext):FormulaResult{
 function groupKey(rule:RuntimeRule){return String(rule.rule_code||rule.rule_family||rule.id);}
 function signature(rule:RuntimeRule){return JSON.stringify({legal_effect:rule.legal_effect??null,value_numeric:rule.value_numeric??null,value_text:rule.value_text??null,unit:rule.unit??null,formula:rule.formula??null});}
 
+function dependencyCycles(dependencies:RuleDependency[],matched:Map<string,RuntimeRule>){
+  const graph=new Map<string,string[]>();
+  for(const dep of dependencies){
+    if(dep.dependency_type!=='REQUIRES'||!matched.has(dep.rule_id)||!matched.has(dep.depends_on_rule_id))continue;
+    graph.set(dep.rule_id,[...(graph.get(dep.rule_id)||[]),dep.depends_on_rule_id]);
+  }
+  const state=new Map<string,0|1|2>();
+  const stack:string[]=[];
+  const found=new Map<string,string[]>();
+  const visit=(id:string)=>{
+    const s=state.get(id)||0;
+    if(s===2)return;
+    if(s===1){
+      const start=stack.lastIndexOf(id);
+      const cycle=[...stack.slice(start),id];
+      const unique=[...new Set(cycle)].sort();
+      found.set(unique.join(':'),unique);
+      return;
+    }
+    state.set(id,1);stack.push(id);
+    for(const next of graph.get(id)||[])visit(next);
+    stack.pop();state.set(id,2);
+  };
+  for(const id of graph.keys())visit(id);
+  return[...found.values()];
+}
+
 export function evaluateRuleGraph(rules:RuntimeRule[],dependencies:RuleDependency[],ctx:RuleContext,asOf:string|Date):RuleRuntimeResult{
   const result:RuleRuntimeResult={selected:[],calculated:[],unknown:[],blocked:[],conflicts:[],trace:[]};
   const matched=new Map<string,RuntimeRule>();
@@ -125,15 +152,29 @@ export function evaluateRuleGraph(rules:RuntimeRule[],dependencies:RuleDependenc
   }
 
   const activeDeps=dependencies.filter(d=>!d.status||d.status==='CONFIRMED');
-  for(const dep of activeDeps.filter(d=>d.dependency_type==='REQUIRES')){
-    const rule=matched.get(dep.rule_id);if(!rule)continue;
-    if(!matched.has(dep.depends_on_rule_id)){
-      matched.delete(dep.rule_id);
+  const requires=activeDeps.filter(d=>d.dependency_type==='REQUIRES');
+
+  // REQUIRES is transitive. Evaluate to a fixed point so the result cannot depend on
+  // PostgreSQL row order (A->B, B->C must remove A whenever C is unavailable).
+  let changed=true;
+  while(changed){
+    changed=false;
+    for(const dep of requires){
+      const rule=matched.get(dep.rule_id);if(!rule||matched.has(dep.depends_on_rule_id))continue;
+      matched.delete(dep.rule_id);changed=true;
       const reason=unknownIds.has(dep.depends_on_rule_id)?'required_rule_unknown':'required_rule_not_applicable';
       result.blocked.push({rule,reason,dependencyRuleId:dep.depends_on_rule_id});
       result.trace.push({ruleId:rule.id,state:'BLOCKED',detail:`${reason}:${dep.depends_on_rule_id}`});
     }
   }
+
+  // Cyclic confirmed dependency graphs are fail-closed: do not silently treat a cycle
+  // as proof that each rule satisfies the other rule's prerequisite.
+  for(const ids of dependencyCycles(requires,matched)){
+    result.conflicts.push({kind:'DEPENDENCY_CYCLE',ruleIds:ids,reason:'confirmed REQUIRES dependency cycle'});
+    for(const id of ids)result.trace.push({ruleId:id,state:'CONFLICT',detail:`dependency_cycle:${ids.join(',')}`});
+  }
+
   for(const dep of activeDeps.filter(d=>d.dependency_type==='OVERRIDES')){
     if(matched.has(dep.rule_id)&&matched.has(dep.depends_on_rule_id)){
       const overridden=matched.get(dep.depends_on_rule_id)!;matched.delete(dep.depends_on_rule_id);

@@ -2,6 +2,34 @@
 # docker-compose.yml is used without explicit -f files. CI/Cortex/production
 # use their own explicit overlays and do not depend on this file.
 services:
+  opensearch:
+    environment:
+      DISABLE_INSTALL_DEMO_CONFIG: 'true'
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - "curl -fsS 'http://127.0.0.1:9200/_cluster/health?wait_for_status=yellow&timeout=5s' >/dev/null"
+      interval: 5s
+      timeout: 10s
+      retries: 30
+      start_period: 30s
+
+  ai-gateway:
+    depends_on:
+      control-api:
+        condition: service_healthy
+      opensearch:
+        condition: service_healthy
+
+  ai-ingest:
+    depends_on:
+      platform-db:
+        condition: service_healthy
+      opensearch:
+        condition: service_healthy
+      platform-db-role-init:
+        condition: service_completed_successfully
+
   aitec-worker:
     build:
       context: .

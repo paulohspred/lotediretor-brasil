@@ -1,7 +1,7 @@
 'use client';
 import {useState} from 'react';
 import {Card,Badge} from '@lotediretor/ui';
-import {getJson,pollJson,postJson,State,useApi} from './ApiBox';
+import {getJson,postJson,State,useApi,waitForJob} from './ApiBox';
 
 const samplePolygon={type:'Polygon',coordinates:[[[-46.634,-23.551],[-46.632,-23.551],[-46.632,-23.549],[-46.634,-23.549],[-46.634,-23.551]]]};
 const sampleMix=[{name:'2D',target_area_m2:65,min_count:8,target_share:.55},{name:'3D',target_area_m2:82,min_count:4,target_share:.30},{name:'1D',target_area_m2:45,min_count:2,target_share:.15}];
@@ -30,10 +30,13 @@ export function AitecWorkspace(){
       const samples=JSON.parse(jobSamplesText);if(!Array.isArray(samples)||samples.length<3)throw new Error('Informe ao menos três amostras TIN.');
       const queued:any=await postJson(`/api/v1/aitec/projects/${selected}/jobs`,{operation:'terrain.tin',seed:Number(jobSeed),kwargs:{samples}},{idempotent:true});
       setJobState(queued);
-      const completed:any=await pollJson(`/api/v1/aitec/jobs/${queued.id}`,(value:any)=>['COMPLETED','FAILED','CANCELLED'].includes(String(value?.status||'')),90000,1000);
+      // The worker can legitimately spend up to 180 s per attempt and retry three
+      // times. Use the durable SSE job stream instead of a 90 s client poll timeout.
+      await waitForJob(queued.id,12*60*1000);
+      const completed:any=await getJson(`/api/v1/aitec/jobs/${queued.id}`);
       setJobState(completed);
       if(completed.status!=='COMPLETED')throw new Error(`Job ${completed.status}: ${completed.error||'falha sem detalhe'}`);
-    }catch(e:any){setJobError(e?.message||String(e))}finally{setJobRunning(false)}
+    }catch(e:any){setJobError(e?.message||String(e));try{if(jobState?.id)setJobState(await getJson(`/api/v1/aitec/jobs/${jobState.id}`))}catch{}}finally{setJobRunning(false)}
   }
 
   return <>

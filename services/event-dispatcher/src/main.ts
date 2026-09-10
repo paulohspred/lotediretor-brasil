@@ -1,13 +1,15 @@
 import {connect,JSONCodec,JetStreamClient,NatsConnection} from 'nats';
 import {Pool} from 'pg';
 
-const VERSION='19.0.0-rc.3';
+const VERSION='20.0.0-preprod';
 const STREAM='LOTEDIRETOR_EVENTS';
 const SUBJECTS=['source.>','analysis.>','report.>','solar.>','aitec.>','document.>','municipality.>','billing.>'];
 const databaseUrl=process.env.PLATFORM_EVENT_DATABASE_URL||'';
 if(!databaseUrl)throw new Error('PLATFORM_EVENT_DATABASE_URL is required');
 const pool=new Pool({connectionString:databaseUrl,max:Number(process.env.EVENT_DB_POOL_MAX||5)});
 const jc=JSONCodec();
+const dispatcherId=`${process.env.HOSTNAME||'event-dispatcher'}:${process.pid}`;
+const leaseSeconds=Math.min(600,Math.max(10,Number(process.env.EVENT_CLAIM_LEASE_SECONDS||60)));
 let nc:NatsConnection|null=null;
 let js:JetStreamClient|null=null;
 
@@ -28,22 +30,29 @@ async function claimBatch(){
     await c.query('BEGIN');
     const r=await c.query(`select id,tenant_id,topic,aggregate_type,aggregate_id,payload,attempts,created_at
       from event.outbox
-      where status in ('PENDING','FAILED') and next_attempt_at<=now()
+      where ((status in ('PENDING','FAILED') and next_attempt_at<=now())
+        or (status='PUBLISHING' and lease_until is not null and lease_until<=now()))
       order by created_at
       for update skip locked
       limit $1`,[Number(process.env.EVENT_BATCH_SIZE||50)]);
-    if(r.rowCount)await c.query(`update event.outbox set status='PUBLISHING',attempts=attempts+1 where id=any($1::uuid[])`,[r.rows.map(x=>x.id)]);
+    if(r.rowCount)await c.query(`update event.outbox
+      set status='PUBLISHING',attempts=attempts+1,claimed_at=now(),lease_until=now()+($2::text||' seconds')::interval,claimed_by=$3
+      where id=any($1::uuid[])`,[r.rows.map(x=>x.id),String(leaseSeconds),dispatcherId]);
     await c.query('COMMIT');
     return r.rows;
   }catch(e){await c.query('ROLLBACK');throw e;}finally{c.release();}
 }
 
 async function markPublished(id:string,stream:string,sequence:number){
-  await pool.query(`update event.outbox set status='PUBLISHED',published_at=now(),last_error=null,publish_metadata=$2::jsonb where id=$1`,[id,JSON.stringify({stream,sequence})]);
+  await pool.query(`update event.outbox
+    set status='PUBLISHED',published_at=now(),last_error=null,publish_metadata=$2::jsonb,claimed_at=null,lease_until=null,claimed_by=null
+    where id=$1`,[id,JSON.stringify({stream,sequence})]);
 }
 async function markFailed(id:string,error:unknown,attempts:number){
   const delay=Math.min(300,Math.max(2,2**Math.min(attempts,8)));
-  await pool.query(`update event.outbox set status='FAILED',last_error=$2,next_attempt_at=now()+($3::text||' seconds')::interval where id=$1`,[id,String((error as any)?.message||error).slice(0,2000),String(delay)]);
+  await pool.query(`update event.outbox
+    set status='FAILED',last_error=$2,next_attempt_at=now()+($3::text||' seconds')::interval,claimed_at=null,lease_until=null,claimed_by=null
+    where id=$1`,[id,String((error as any)?.message||error).slice(0,2000),String(delay)]);
 }
 
 async function dispatchOnce(){
@@ -60,7 +69,7 @@ async function dispatchOnce(){
 }
 
 async function main(){
-  console.log(JSON.stringify({service:'event-dispatcher',version:VERSION,transport:'NATS_JETSTREAM',stream:STREAM,status:'STARTING'}));
+  console.log(JSON.stringify({service:'event-dispatcher',version:VERSION,transport:'NATS_JETSTREAM',stream:STREAM,dispatcherId,leaseSeconds,status:'STARTING'}));
   let stopped=false;
   const stop=async()=>{stopped=true;try{await nc?.drain();}catch{}await pool.end();};
   process.on('SIGTERM',()=>void stop());process.on('SIGINT',()=>void stop());

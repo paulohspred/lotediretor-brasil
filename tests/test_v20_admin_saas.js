@@ -38,6 +38,7 @@ for(const token of ['admin.idempotency_record','catalog.service_contract','catal
 const controller=fs.readFileSync(path.join(root,'services/control-api/src/v20-admin.controller.ts'),'utf8');
 for(const token of ['idempotency_key_required','maker_checker_violation','SUPPORT_SESSION_STARTED','billing/payment','billing.reconcile','fiscal/nfse','analytics/funnels','analytics/experiments','featureRollout','ROLLBACK_EXECUTED','ai-ops/usage','ops/backups','ops/restores','ops/dr-drills'])assert(controller.includes(token),token);
 assert(controller.includes("set_config('app.control_admin','true',true)"));
-const rls=fs.readFileSync(path.join(root,'ops/rls/runtime-isolation.sh'),'utf8');assert(rls.includes('CONTROL_DB_APP_USER'));assert(rls.includes('support.customer_success_account'));assert(rls.includes('platform + control'));
+const rls=fs.readFileSync(path.join(root,'ops/rls/runtime-isolation.sh'),'utf8');
+for(const token of ['CONTROL_DB_APP_USER','property360.property','aitec.job','support.customer_success_account','cross tenant write unexpectedly succeeded','control cross tenant write unexpectedly succeeded'])assert(rls.includes(token),token);
 const backup=fs.readFileSync(path.join(root,'ops/backup/backup.sh'),'utf8');const restore=fs.readFileSync(path.join(root,'ops/backup/restore-drill.sh'),'utf8');assert(backup.includes('ops.backup_run'));assert(restore.includes('ops.restore_run'));assert(restore.includes('ops.dr_drill'));
 console.log('v20 Admin SaaS financial/support/analytics/ops contracts OK');

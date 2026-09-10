@@ -89,12 +89,14 @@ capture(){
   docker compose logs --no-color --timestamps > "$ARTIFACT_DIR/compose.log" 2>&1
   docker system df > "$ARTIFACT_DIR/docker-df.txt" 2>&1
   docker compose images --format json > "$ARTIFACT_DIR/compose-images.jsonl" 2>/dev/null || true
+  # Ledger schema is name + checksum_sha256. Capture both so the evidence proves
+  # exactly which immutable migration contents were applied to this qualification.
   docker compose exec -T -e PGPASSWORD="$PLATFORM_DB_MIGRATION_PASSWORD" platform-db \
-    psql -h 127.0.0.1 -U "$PLATFORM_DB_MIGRATION_USER" -d "$PLATFORM_DB_NAME" -Atqc \
-    "select version from public.schema_migrations order by version" > "$ARTIFACT_DIR/platform-migrations.txt" 2>/dev/null || true
+    psql -h 127.0.0.1 -U "$PLATFORM_DB_MIGRATION_USER" -d "$PLATFORM_DB_NAME" -AtF $'\t' -c \
+    "select name,checksum_sha256 from public.schema_migrations order by name" > "$ARTIFACT_DIR/platform-migrations.txt" 2>/dev/null || true
   docker compose exec -T -e PGPASSWORD="$CONTROL_DB_MIGRATION_PASSWORD" control-db \
-    psql -h 127.0.0.1 -U "$CONTROL_DB_MIGRATION_USER" -d "$CONTROL_DB_NAME" -Atqc \
-    "select version from public.schema_migrations order by version" > "$ARTIFACT_DIR/control-migrations.txt" 2>/dev/null || true
+    psql -h 127.0.0.1 -U "$CONTROL_DB_MIGRATION_USER" -d "$CONTROL_DB_NAME" -AtF $'\t' -c \
+    "select name,checksum_sha256 from public.schema_migrations order by name" > "$ARTIFACT_DIR/control-migrations.txt" 2>/dev/null || true
   cp /tmp/ld-opensearch-health.json "$ARTIFACT_DIR/opensearch-health.json" 2>/dev/null
   cp /tmp/ld-ai-*.json "$ARTIFACT_DIR/" 2>/dev/null
   cp /tmp/ld-aitec-*.json "$ARTIFACT_DIR/" 2>/dev/null

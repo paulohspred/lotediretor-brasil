@@ -9,13 +9,13 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "next": "^15.2.0",
+    "next": "15.5.24",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "@lotediretor/design-tokens": "19.0.0-rc.3",
     "@lotediretor/ui": "19.0.0-rc.3",
     "@lotediretor/domain-types": "19.0.0-rc.3",
-    "maplibre-gl": "^5.1.0",
+    "maplibre-gl": "6.4.1",
     "@lotediretor/api-contracts": "19.0.0-rc.3"
   },
   "devDependencies": {

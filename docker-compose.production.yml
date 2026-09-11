@@ -121,7 +121,7 @@ services:
       - CMD
       - python
       - -c
-      - import urllib.request; urllib.request.urlopen('http://127.0.0.1:9104/metrics',timeout=3)
+      - "import urllib.request; s=urllib.request.urlopen('http://127.0.0.1:9104/metrics',timeout=3).read().decode(); assert 'lotediretor_aitec_worker_ready 1.0' in s"
       interval: 10s
       timeout: 5s
       retries: 12

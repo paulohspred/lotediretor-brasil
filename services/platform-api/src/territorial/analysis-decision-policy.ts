@@ -8,10 +8,11 @@ export type AnalysisDecisionSignals={
   hasSpatialEvidence:boolean;
   legalTemporalConflictCount:number;
   legalTemporalUnknownCount:number;
+  legalTemporalPendingCount:number;
 };
 
 export function deriveAnalysisRunStatus(signals:AnalysisDecisionSignals):AnalysisRunStatus{
-  if(signals.legalTemporalConflictCount>0||signals.legalTemporalUnknownCount>0)return 'NEEDS_REVIEW';
+  if(signals.legalTemporalConflictCount>0||signals.legalTemporalUnknownCount>0||signals.legalTemporalPendingCount>0)return 'NEEDS_REVIEW';
   if(signals.viabilityStatus==='CONFLICTING'||signals.viabilityStatus==='UNKNOWN')return 'NEEDS_REVIEW';
   if(!signals.hasRules&&!signals.hasSpatialEvidence)return 'INSUFFICIENT_DATA';
   return 'COMPLETED';

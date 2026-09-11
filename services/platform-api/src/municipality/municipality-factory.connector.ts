@@ -1,5 +1,5 @@
 import {PutObjectCommand,S3Client} from '@aws-sdk/client-s3';
-import {buildDiscoveryUrl,buildIngestUrl,FactoryAdapter,inspectDiscoveryPayload,sha256Hex,validateFactoryUrl} from './municipality-factory.logic';
+import {buildDiscoveryUrl,buildIngestUrl,expectedOutputCrs,FactoryAdapter,inspectDiscoveryPayload,inspectGeoJsonForQa,sha256Hex,validateFactoryUrl} from './municipality-factory.logic';
 
 export type FactoryFetchResult={status:number;contentType:string;bytes:Buffer;url:string;headers:Record<string,string>};
 export type FactoryIngestResult={bytes:Buffer;contentType:string;objectKey:string;sha256:string;byteSize:number;pageCount:number;featureCount:number|null;metadata:any};
@@ -8,6 +8,7 @@ function positiveInt(v:any,fallback:number,max:number){const n=Number(v);return 
 function envAllowedHosts(){return String(process.env.MUNICIPALITY_FACTORY_ALLOWED_HOSTS||'').split(',').map(x=>x.trim().toLowerCase()).filter(Boolean);}
 function safeHeaderMap(h:Headers){const keep=['content-type','etag','last-modified','content-length','content-disposition'];const out:Record<string,string>={};for(const k of keep){const v=h.get(k);if(v)out[k]=v.slice(0,1000);}return out;}
 function extension(adapter:FactoryAdapter,contentType:string){if(adapter==='PDF')return 'pdf';if(adapter==='ZIP')return 'zip';if(adapter==='HTML')return 'html';if(adapter==='WMS')return contentType.includes('png')?'png':contentType.includes('jpeg')?'jpg':'bin';return 'json';}
+function normalizedSourceDate(headers:Record<string,string>){const raw=headers['last-modified'];if(!raw)return null;const ms=Date.parse(raw);return Number.isFinite(ms)?new Date(ms).toISOString():null;}
 
 export async function fetchLimited(rawUrl:string,maxBytes:number,timeoutMs:number):Promise<FactoryFetchResult>{
   const allowed=envAllowedHosts();const u=validateFactoryUrl(rawUrl,allowed);const controller=new AbortController();const timer=setTimeout(()=>controller.abort(),timeoutMs);
@@ -56,7 +57,17 @@ export async function ingestSource(input:{adapter:FactoryAdapter;endpointUrl:str
     const u=buildIngestUrl(input.adapter,endpoint,input.pinnedConfig);validateFactoryUrl(u.toString(),allowed);const r=await fetchLimited(u.toString(),maxBytes,timeout);if(r.status<200||r.status>=300)throw new Error(`factory_ingest_http_${r.status}`);bytes=r.bytes;contentType=r.contentType;headers=r.headers;
     if(input.adapter==='CKAN'&&contentType.includes('json')){try{const j=JSON.parse(bytes.toString('utf8'));featureCount=Array.isArray(j?.features)?j.features.length:null;}catch{/* raw resource is retained */}}
   }
+  let qaMetadata:any={structureOk:bytes.length>0,outputCrs:null,unknownCrs:false,invalidGeometryCount:null,featureCount};
+  if(input.adapter==='WFS'||input.adapter==='ARCGIS'){
+    qaMetadata=inspectGeoJsonForQa(bytes,expectedOutputCrs(input.adapter,input.pinnedConfig));
+    if(qaMetadata.outputCrs!=='EPSG:4326'||qaMetadata.unknownCrs)throw new Error('factory_output_crs_not_wgs84');
+    featureCount=qaMetadata.featureCount;
+  }else if(input.adapter==='CKAN'&&contentType.includes('json')){
+    try{const parsed=JSON.parse(bytes.toString('utf8'));if(parsed?.type==='FeatureCollection')qaMetadata=inspectGeoJsonForQa(bytes,null);}catch{/* non-GeoJSON CKAN resources stay raw */}
+  }else if(input.adapter==='PDF')qaMetadata.structureOk=bytes.subarray(0,5).toString('ascii')==='%PDF-';
+  else if(input.adapter==='ZIP')qaMetadata.structureOk=bytes.length>=4&&bytes[0]===0x50&&bytes[1]===0x4b&&[0x03,0x05,0x07].includes(bytes[2]);
+  else if(input.adapter==='HTML')qaMetadata.structureOk=/<html|<!doctype html/i.test(bytes.subarray(0,2_000_000).toString('utf8'));
   const sha256=sha256Hex(bytes);const ext=extension(input.adapter,contentType);const objectKey=`municipality-factory/${input.municipalityIbge}/${input.datasetCode}/${sha256}.${ext}`;const bucket=String(process.env.S3_BUCKET||'');if(!bucket)throw new Error('s3_bucket_required');
   await s3Client().send(new PutObjectCommand({Bucket:bucket,Key:objectKey,Body:bytes,ContentType:contentType,Metadata:{sha256,adapter:input.adapter.toLowerCase(),municipality:input.municipalityIbge,dataset:input.datasetCode.toLowerCase()}}));
-  return{bytes,contentType,objectKey,sha256,byteSize:bytes.length,pageCount,featureCount,metadata:{factoryVersion:'municipality-factory-v20.1',adapter:input.adapter,contract:{code:input.contractCode,version:input.contractVersion},pinnedConfigFingerprint:sha256Hex(JSON.stringify(input.pinnedConfig||{})),pageCount,featureCount,headers,endpointHost:endpoint.hostname,fetchedAt:new Date().toISOString()}};
+  return{bytes,contentType,objectKey,sha256,byteSize:bytes.length,pageCount,featureCount,metadata:{factoryVersion:'municipality-factory-v20.1',adapter:input.adapter,contract:{code:input.contractCode,version:input.contractVersion},pinnedConfigFingerprint:sha256Hex(JSON.stringify(input.pinnedConfig||{})),pageCount,featureCount,headers,sourceDate:normalizedSourceDate(headers),...qaMetadata,endpointHost:endpoint.hostname,fetchedAt:new Date().toISOString()}};
 }

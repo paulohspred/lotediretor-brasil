@@ -1,4 +1,5 @@
 from pathlib import Path
+import re
 import subprocess
 
 root=Path(__file__).resolve().parents[1]
@@ -26,7 +27,10 @@ for token in ['OP_REGISTRY','STUDY_PREPROJECT_NOT_EXECUTIVE','terrain.tin','opti
     assert token in api,token
 assert 'Depends(internal_token)' in entrypoint
 assert 'include_router(advanced_router' in entrypoint
-assert 'COPY services/aitec-engine/app ./app' in dockerfile
+# Validate the image contract rather than one exact COPY spelling. Security hardening may
+# legitimately add --chown while preserving the same application source/destination.
+assert re.search(r'^COPY(?:\s+--\S+(?:=\S+)?)?\s+services/aitec-engine/app\s+\./app\s*$',dockerfile,re.M), 'aitec app COPY missing'
+assert re.search(r'^USER\s+(?!root\b)\S+',dockerfile,re.M), 'aitec runtime must be non-root'
 assert 'app.entrypoint:app' in dockerfile
 
 for test in [

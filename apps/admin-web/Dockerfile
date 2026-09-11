@@ -9,8 +9,9 @@ RUN npm run build -w @lotediretor/admin-web
 FROM node:22-alpine
 WORKDIR /app
 ENV NODE_ENV=production
-COPY --from=build /workspace/apps/admin-web/.next/standalone ./
-COPY --from=build /workspace/apps/admin-web/.next/static ./apps/admin-web/.next/static
-COPY --from=build /workspace/apps/admin-web/public ./apps/admin-web/public
+COPY --from=build --chown=node:node /workspace/apps/admin-web/.next/standalone ./
+COPY --from=build --chown=node:node /workspace/apps/admin-web/.next/static ./apps/admin-web/.next/static
+COPY --from=build --chown=node:node /workspace/apps/admin-web/public ./apps/admin-web/public
+USER node
 EXPOSE 3000
 CMD ["node","apps/admin-web/server.js"]

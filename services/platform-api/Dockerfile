@@ -10,7 +10,8 @@ RUN npm run build -w @lotediretor/platform-api
 FROM node:22-alpine
 WORKDIR /workspace
 ENV NODE_ENV=production
-COPY --from=build /workspace/node_modules ./node_modules
-COPY --from=build /workspace/services/platform-api/dist ./services/platform-api/dist
-COPY --from=build /workspace/db ./db
+COPY --from=build --chown=node:node /workspace/node_modules ./node_modules
+COPY --from=build --chown=node:node /workspace/services/platform-api/dist ./services/platform-api/dist
+COPY --from=build --chown=node:node /workspace/db ./db
+USER node
 CMD ["node","services/platform-api/dist/main.js"]

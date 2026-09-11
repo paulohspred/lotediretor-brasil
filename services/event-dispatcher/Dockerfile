@@ -8,6 +8,7 @@ RUN npm run build -w @lotediretor/event-dispatcher
 FROM node:22-alpine
 WORKDIR /workspace
 ENV NODE_ENV=production
-COPY --from=build /workspace/node_modules ./node_modules
-COPY --from=build /workspace/services/event-dispatcher/dist ./services/event-dispatcher/dist
+COPY --from=build --chown=node:node /workspace/node_modules ./node_modules
+COPY --from=build --chown=node:node /workspace/services/event-dispatcher/dist ./services/event-dispatcher/dist
+USER node
 CMD ["node","services/event-dispatcher/dist/main.js"]

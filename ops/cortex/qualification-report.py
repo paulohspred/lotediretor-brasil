@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import re
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -53,6 +54,26 @@ def file_check(name: str, path: Path, validator=None):
     return {'check':name,'status':'PASS','path':str(path.relative_to(artifact)),'bytes':path.stat().st_size}
 
 
+def migration_ledger_validator(_value, path: Path):
+    lines=[line for line in path.read_text(encoding='utf-8',errors='replace').splitlines() if line.strip()]
+    if not lines:
+        return False, 'migration ledger empty'
+    seen=set()
+    for index,line in enumerate(lines,1):
+        parts=line.split('\t')
+        if len(parts)!=2:
+            return False, f'line {index}: expected name<TAB>sha256'
+        name,checksum=parts
+        if not name.endswith('.sql') or '/' in name or '\\' in name:
+            return False, f'line {index}: invalid migration name {name!r}'
+        if not re.fullmatch(r'[0-9a-f]{64}',checksum):
+            return False, f'line {index}: invalid sha256 for {name}'
+        if name in seen:
+            return False, f'line {index}: duplicate migration {name}'
+        seen.add(name)
+    return True, f'{len(lines)} immutable migration checksums recorded'
+
+
 gates = {}
 ledger = artifact / 'gate-status.tsv'
 if ledger.exists():
@@ -74,8 +95,8 @@ checks.append(file_check('staging_parity',artifact/'staging-parity.json',lambda 
 checks.append(file_check('immutable_release',artifact/'immutable-release.json',lambda v,p:(isinstance(v,dict) and v.get('status')=='PASS' and int(v.get('promotedServices',0))>=20,f"promotedServices={v.get('promotedServices') if isinstance(v,dict) else None}")))
 checks.append(file_check('rollback_contract',artifact/'rollback-contract.txt',lambda v,p:(bool(p.read_text(encoding='utf-8',errors='replace').strip()),'rollback self-test output present')))
 checks.append(file_check('signature_provenance_contract',artifact/'signature-contract.txt',lambda v,p:('signature/provenance contract self-test PASS' in p.read_text(encoding='utf-8',errors='replace'),'Cosign signature + SLSA provenance fail-closed contract present')))
-checks.append(file_check('platform_migrations',artifact/'platform-migrations.txt',lambda v,p:(bool(p.read_text().strip()),'non-empty migration ledger')))
-checks.append(file_check('control_migrations',artifact/'control-migrations.txt',lambda v,p:(bool(p.read_text().strip()),'non-empty migration ledger')))
+checks.append(file_check('platform_migrations',artifact/'platform-migrations.txt',migration_ledger_validator))
+checks.append(file_check('control_migrations',artifact/'control-migrations.txt',migration_ledger_validator))
 checks.append(file_check('playwright_results',artifact/'browser'/'playwright-results.json',lambda v,p:(isinstance(v,dict) and int((v.get('stats') or {}).get('unexpected',0))==0 and int((v.get('stats') or {}).get('expected',0))>0,f"stats={(v or {}).get('stats') if isinstance(v,dict) else None}")))
 checks.append(file_check('k6_summary',artifact/'load'/'k6-summary.json'))
 checks.append(file_check('security_baseline',artifact/'security'/'result.json',lambda v,p:(isinstance(v,dict) and v.get('status')=='PASS' and 'supply_chain_inventory' in (v.get('checks') or []),f"checks={v.get('checks') if isinstance(v,dict) else None}")))

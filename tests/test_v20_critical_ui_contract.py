@@ -23,7 +23,7 @@ for needle in [
     "postJson(`/api/v1/aitec/projects/${selected}/jobs`",
     'waitForJob(queued.id,12*60*1000)',
     "getJson(`/api/v1/aitec/jobs/${queued.id}`",
-    'aitec-job-status','aitec-job-result','professional',
+    'aitec-job-status','aitec-job-result','revisão profissional',
 ]: assert needle in aitec, f'A.I TEC UI missing persisted job contract: {needle}'
 for needle in [
     'export async function waitForJob',

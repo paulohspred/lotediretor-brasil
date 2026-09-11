@@ -180,7 +180,7 @@ export class AnalysisV20Service{
     const snapshotIds=new Set<string>();if(parcel.source_snapshot_id)snapshotIds.add(parcel.source_snapshot_id);if(zone?.source_snapshot_id)snapshotIds.add(zone.source_snapshot_id);for(const rule of ruleRows)if(rule.source_snapshot_id)snapshotIds.add(String(rule.source_snapshot_id));for(const item of spatial.rows)if(item.source_snapshot_id)snapshotIds.add(String(item.source_snapshot_id));for(const sid of snapshotIds)await c.query(`insert into analysis.snapshot_ref(run_id,source_snapshot_id,purpose) values($1,$2,'INPUT') on conflict do nothing`,[runId,sid]);
 
     const temporalDecisionUnknown=temporalStates.filter(x=>x.rule.status==='CONFIRMED'&&x.state==='UNKNOWN').length+temporal.unknownRelationIds.length;
-    const status=deriveAnalysisRunStatus({viabilityStatus:decision.status,hasRules:runtime.selected.length>0,hasSpatialEvidence:spatial.rows.length>0,legalTemporalConflictCount:temporal.conflicts.length,legalTemporalUnknownCount:temporalDecisionUnknown});
+    const status=deriveAnalysisRunStatus({viabilityStatus:decision.status,hasRules:runtime.selected.length>0,hasSpatialEvidence:spatial.rows.length>0,legalTemporalConflictCount:temporal.conflicts.length,legalTemporalUnknownCount:temporalDecisionUnknown,legalTemporalPendingCount:temporal.pendingRelationIds.length});
     await c.query(`update analysis.run set status=$2 where id=$1`,[runId,status]);
 
     const limitations=[

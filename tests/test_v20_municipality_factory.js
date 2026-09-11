@@ -25,6 +25,13 @@ assert.equal(f.detectAdapter('https://geo.prefeitura.gov.br/lei.pdf'),'PDF');
 assert.equal(f.detectAdapter('https://geo.prefeitura.gov.br/base.zip'),'ZIP');
 assert.equal(f.detectAdapter('https://geo.prefeitura.gov.br/legislacao'),'HTML');
 
+assert.equal(f.canonicalWgs84Crs('EPSG:4326'),'EPSG:4326');
+assert.equal(f.canonicalWgs84Crs('4326'),'EPSG:4326');
+assert.equal(f.canonicalWgs84Crs('urn:ogc:def:crs:OGC:1.3:CRS84'),'EPSG:4326');
+assert.equal(f.canonicalWgs84Crs('EPSG:3857'),null);
+assert.equal(f.expectedOutputCrs('WFS',{srsName:'EPSG:4326'}),'EPSG:4326');
+assert.equal(f.expectedOutputCrs('ARCGIS',{layerId:0}),'EPSG:4326');
+
 const wfs=f.buildIngestUrl('WFS',new URL('https://geo.prefeitura.gov.br/ows'),{typeName:'parcelas',srsName:'EPSG:4326',pageSize:100,startIndex:200});
 assert.equal(wfs.searchParams.get('request'),'GetFeature');assert.equal(wfs.searchParams.get('typeNames'),'parcelas');assert.equal(wfs.searchParams.get('startIndex'),'200');
 const arc=f.buildIngestUrl('ARCGIS',new URL('https://geo.prefeitura.gov.br/arcgis/rest/services/lotes/FeatureServer'),{layerId:0,pageSize:500,resultOffset:1000});
@@ -40,7 +47,16 @@ assert.equal(f.inspectDiscoveryPayload('PDF',200,'application/pdf',Buffer.from('
 assert.equal(f.inspectDiscoveryPayload('ZIP',200,'application/zip',Buffer.from([0x50,0x4b,0x03,0x04,0,0])).status,'PASS');
 assert.equal(f.inspectDiscoveryPayload('WFS',500,'text/plain',Buffer.from('error')).status,'FAIL');
 
+const validGeo=Buffer.from(JSON.stringify({type:'FeatureCollection',features:[{type:'Feature',properties:{id:1},geometry:{type:'Polygon',coordinates:[[[-46.7,-23.5],[-46.6,-23.5],[-46.6,-23.4],[-46.7,-23.5]]]}}]}));
+let geoQa=f.inspectGeoJsonForQa(validGeo,'EPSG:4326');
+assert.equal(geoQa.structureOk,true);assert.equal(geoQa.featureCount,1);assert.equal(geoQa.invalidGeometryCount,0);assert.equal(geoQa.outputCrs,'EPSG:4326');assert.equal(geoQa.unknownCrs,false);
+const invalidGeo=Buffer.from(JSON.stringify({type:'FeatureCollection',features:[{type:'Feature',properties:{id:1},geometry:{type:'Point',coordinates:[999999,999999]}}]}));
+geoQa=f.inspectGeoJsonForQa(invalidGeo,'EPSG:4326');assert.equal(geoQa.invalidGeometryCount,1);
+const wrongCrs=Buffer.from(JSON.stringify({type:'FeatureCollection',crs:{type:'name',properties:{name:'EPSG:3857'}},features:[{type:'Feature',properties:{},geometry:{type:'Point',coordinates:[0,0]}}]}));
+geoQa=f.inspectGeoJsonForQa(wrongCrs,'EPSG:4326');assert.equal(geoQa.unknownCrs,true);assert.equal(geoQa.outputCrs,null);
+
 let gate=f.activationGate({adapter:'WFS',licenseStatus:'VERIFIED',discoveryStatus:'PASS',contractId:'c1',pinnedConfig:{typeName:'lotes',srsName:'EPSG:4326'}});assert.equal(gate.status,'READY');
+gate=f.activationGate({adapter:'WFS',licenseStatus:'VERIFIED',discoveryStatus:'PASS',contractId:'c1',pinnedConfig:{typeName:'lotes',srsName:'EPSG:3857'}});assert.equal(gate.status,'BLOCKED');assert(gate.reasons.includes('OUTPUT_CRS_MUST_BE_EPSG_4326'));
 gate=f.activationGate({adapter:'WFS',licenseStatus:'UNVERIFIED',discoveryStatus:'PASS',contractId:'c1',pinnedConfig:{}});assert.equal(gate.status,'BLOCKED');assert(gate.reasons.includes('LICENSE_NOT_VERIFIED'));assert(gate.reasons.includes('PIN_REQUIRED:typeName'));
 
 const qa=f.qaFromNormalized({mediaClass:'MIXED',licenseVerified:true,baseDate:'2026-08-25',sourceDate:'2026-08-24',featureCount:10,invalidGeometryCount:0,unknownCrs:false,documentPages:20,citations:4,structureOk:true});

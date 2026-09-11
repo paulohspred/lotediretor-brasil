@@ -28,6 +28,44 @@ export function detectAdapter(raw:string,hint?:string):FactoryAdapter{
   if(path.endsWith('.pdf'))return 'PDF';if(path.endsWith('.zip'))return 'ZIP';return 'HTML';
 }
 
+export function canonicalWgs84Crs(raw:any):'EPSG:4326'|null{
+  const s=String(raw??'').trim().toUpperCase().replace(/\s+/g,'');
+  if(!s)return null;
+  if(s==='4326'||s==='EPSG:4326'||s==='CRS:84'||s==='CRS84'||s.endsWith(':CRS84')||s.endsWith('::4326'))return 'EPSG:4326';
+  return null;
+}
+export function expectedOutputCrs(adapter:FactoryAdapter,config:any):'EPSG:4326'|null{
+  if(adapter==='WFS')return canonicalWgs84Crs(config?.srsName);
+  if(adapter==='ARCGIS')return canonicalWgs84Crs(config?.outSR??4326);
+  return null;
+}
+function geoJsonDeclaredCrs(value:any){
+  if(!value)return null;
+  if(typeof value==='string')return canonicalWgs84Crs(value);
+  return canonicalWgs84Crs(value?.properties?.name??value?.name??value?.properties?.code);
+}
+function validPosition(v:any,wgs84:boolean){return Array.isArray(v)&&v.length>=2&&Number.isFinite(Number(v[0]))&&Number.isFinite(Number(v[1]))&&(!wgs84||(Number(v[0])>=-180&&Number(v[0])<=180&&Number(v[1])>=-90&&Number(v[1])<=90));}
+function validCoordinates(v:any,depth:number,wgs84:boolean):boolean{
+  if(depth===0)return validPosition(v,wgs84);
+  return Array.isArray(v)&&v.length>0&&v.every(x=>validCoordinates(x,depth-1,wgs84));
+}
+function validGeometry(g:any,wgs84:boolean):boolean{
+  if(!g||typeof g!=='object')return false;
+  if(g.type==='GeometryCollection')return Array.isArray(g.geometries)&&g.geometries.length>0&&g.geometries.every((x:any)=>validGeometry(x,wgs84));
+  const depth:Record<string,number>={Point:0,MultiPoint:1,LineString:1,MultiLineString:2,Polygon:2,MultiPolygon:3};
+  return depth[g.type]!==undefined&&validCoordinates(g.coordinates,depth[g.type],wgs84);
+}
+export function inspectGeoJsonForQa(bytes:Buffer,expectedCrs?:string|null){
+  let j:any;try{j=JSON.parse(bytes.toString('utf8'));}catch{return{structureOk:false,featureCount:0,invalidGeometryCount:0,outputCrs:null,unknownCrs:true};}
+  if(j?.type!=='FeatureCollection'||!Array.isArray(j.features))return{structureOk:false,featureCount:0,invalidGeometryCount:0,outputCrs:null,unknownCrs:true};
+  const expected=canonicalWgs84Crs(expectedCrs);const declared=j.crs?geoJsonDeclaredCrs(j.crs):null;
+  // RFC 7946 FeatureCollections without a legacy `crs` member are WGS84. When a connector
+  // explicitly requests an output CRS, a non-WGS84 declaration is rejected instead of relabelled.
+  const outputCrs=j.crs?declared:(expected||'EPSG:4326');const unknownCrs=outputCrs!=='EPSG:4326';
+  const invalidGeometryCount=j.features.reduce((n:number,f:any)=>n+(f?.type==='Feature'&&validGeometry(f.geometry,!unknownCrs)?0:1),0);
+  return{structureOk:true,featureCount:j.features.length,invalidGeometryCount,outputCrs,unknownCrs};
+}
+
 export function requiredPinnedFields(adapter:FactoryAdapter){
   switch(adapter){
     case 'WFS':return ['typeName','srsName'];
@@ -76,7 +114,9 @@ export function inspectDiscoveryPayload(adapter:FactoryAdapter,httpStatus:number
 }
 
 export function activationGate(input:{adapter:FactoryAdapter;licenseStatus:string;discoveryStatus:string;contractId?:string|null;pinnedConfig:any}){
-  const reasons:string[]=[];if(input.licenseStatus!=='VERIFIED')reasons.push('LICENSE_NOT_VERIFIED');if(input.discoveryStatus!=='PASS')reasons.push('DISCOVERY_NOT_PASS');if(!input.contractId)reasons.push('CONTRACT_REQUIRED');for(const f of missingPinnedFields(input.adapter,input.pinnedConfig))reasons.push(`PIN_REQUIRED:${f}`);return{status:reasons.length?'BLOCKED':'READY',reasons};
+  const reasons:string[]=[];if(input.licenseStatus!=='VERIFIED')reasons.push('LICENSE_NOT_VERIFIED');if(input.discoveryStatus!=='PASS')reasons.push('DISCOVERY_NOT_PASS');if(!input.contractId)reasons.push('CONTRACT_REQUIRED');for(const f of missingPinnedFields(input.adapter,input.pinnedConfig))reasons.push(`PIN_REQUIRED:${f}`);
+  if((input.adapter==='WFS'||input.adapter==='ARCGIS')&&expectedOutputCrs(input.adapter,input.pinnedConfig)!=='EPSG:4326')reasons.push('OUTPUT_CRS_MUST_BE_EPSG_4326');
+  return{status:reasons.length?'BLOCKED':'READY',reasons};
 }
 export function requiredQaKinds(mediaClass:MediaClass){return mediaClass==='GIS'?['GIS','STRUCTURE','LICENSE','TEMPORAL']:mediaClass==='DOCUMENT'?['LEGAL','STRUCTURE','LICENSE','TEMPORAL']:['GIS','LEGAL','STRUCTURE','LICENSE','TEMPORAL'];}
 export function homologationGate(input:{mediaClass:MediaClass;connectorStatus:string;licenseStatus:string;ingestStatus:string;qa:Record<string,string>;goldenStatus:string;approvedProfessionalGoldens:number;reviewer?:string;reason?:string}){

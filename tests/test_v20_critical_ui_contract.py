@@ -6,6 +6,7 @@ def text(path:str): return (root/path).read_text(encoding='utf-8')
 
 imovel=text('apps/client-web/components/workspaces/Imovel360Workspace.tsx')
 aitec=text('apps/client-web/components/workspaces/AitecWorkspace.tsx')
+api_box=text('apps/client-web/components/workspaces/ApiBox.tsx')
 chat=text('apps/client-web/components/workspaces/AiChatBox.tsx')
 billing=text('apps/admin-web/components/BillingWorkspace.tsx')
 billing_page=text('apps/admin-web/app/billing/page.tsx')
@@ -20,9 +21,15 @@ for needle in [
 for needle in [
     "operation:'terrain.tin'",
     "postJson(`/api/v1/aitec/projects/${selected}/jobs`",
-    "pollJson(`/api/v1/aitec/jobs/${queued.id}`",
+    'waitForJob(queued.id,12*60*1000)',
+    "getJson(`/api/v1/aitec/jobs/${queued.id}`",
     'aitec-job-status','aitec-job-result','professional',
 ]: assert needle in aitec, f'A.I TEC UI missing persisted job contract: {needle}'
+for needle in [
+    'export async function waitForJob',
+    'new EventSource(',
+    '/events',
+]: assert needle in api_box, f'ApiBox missing durable SSE job stream contract: {needle}'
 
 for needle in ['ai-chat-output-${assistant}','credentials:\'include\'','subjectId','baseDate']:
     assert needle in chat, f'grounded chat UI missing contract: {needle}'
